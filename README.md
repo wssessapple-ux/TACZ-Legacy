@@ -117,9 +117,8 @@
 
 继承上游 TACZ 的版权与许可约束；本仓库仅包含移植开发所需代码骨架与文档。
 ## 👥 贡献者
-<a href="https://github.com/KasumiNova"><img src="https://github.com/KasumiNova.png" width="60"></a>
-<a href="https://github.com/wssessapple-ux"><img src="https://github.com/wssessapple-ux.png" width="60"></a>
+[![](https://github.com/KasumiNova.png?size=60)](https://github.com/KasumiNova)
+[![](https://github.com/wssessapple‑ux.png?size=60)](https://github.com/wssessapple‑ux)
 
 - [KasumiNova](https://github.com/KasumiNova)：上游 TACZ‑Legacy 原始仓库作者
-- [wssessapple‑ux](https://github.com/wssessapple-ux)：Minecraft 1.12.2‑Forge 构建发行者
-
+- [wssessapple‑ux](https://github.com/wssessapple‑ux)：Minecraft 1.12.2‑Forge 构建发行者
