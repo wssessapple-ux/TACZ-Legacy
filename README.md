@@ -7,6 +7,13 @@
 - 源码版权归原作者及上游 TaCZ 项目所有，本项目遵循 **GPL‑3.0** 协议开源。
 - 本构建未修改任何核心逻辑，仅提供版本适配构建。
 - 请勿用于商业用途、勿向原项目反馈本版问题、勿冒充官方传播。
+🔍 快速找到本仓库
+1. 完整直链（100%命中，推荐）：
+https://github.com/wssessapple-ux/TACZ-Legacy
+2. GitHub搜索‑包含分叉结果
+TACZ‑Legacy fork:true
+3. 精确寻址搜索
+repo:wssessapple-ux/TACZ-Legacy
 
 ---
 
