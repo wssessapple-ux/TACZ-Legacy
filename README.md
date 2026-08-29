@@ -116,3 +116,7 @@
 ## License
 
 继承上游 TACZ 的版权与许可约束；本仓库仅包含移植开发所需代码骨架与文档。
+## 👥 贡献者
+- **KasumiNova**：上游 TACZ‑Legacy 原始仓库作者
+- **wssessapple‑ux**：Minecraft 1.12.2‑Forge 构建发行者
+- 
