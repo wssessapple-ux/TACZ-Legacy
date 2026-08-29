@@ -143,4 +143,9 @@ repo:wssessapple-ux/TACZ-Legacy
 
 - [KasumiNova](https://github.com/KasumiNova)：上游 TACZ‑Legacy 原始仓库作者
 - [wssessapple‑ux](https://github.com/wssessapple‑ux)：Minecraft 1.12.2‑Forge 构建发行者
+注:> ⚠️ 项目现状说明
+> 上游仓库 KasumiNova/TACZ‑Legacy 最近一次源代码更新为5个月前，Issues长期无维护回复。
+> 在上游全部6个衍生分叉当中，本仓库是当前唯一保持活跃更新、并且提供预编译Jar发行包以及SHA‑256完整性校验清单的分发仓库。其余分叉最近提交距今至少3周，已处于停滞休眠状态。
+>
+> 本仓库定位：上游源码原样编译分发，不修改源代码，不承担上游遗留渲染缺陷的修复工作。
 
