@@ -37,11 +37,11 @@ repo:wssessapple-ux/TACZ-Legacy
 **1. MixinBooter**
 - **作者**：Rongmario (及 CleanroomMC 团队维护)
 - **作用**：专为 1.12.2 等老版本设计的核心库，用于引导和加载 Mixin，解决模组间的核心冲突，是现代模组在老版本平稳运行的基石。
-
+- **版本**:10.7
 **2. Forgelin‑Continuous**
 - **作者**：Community / Continuity Maintainers
 - **作用**：Kotlin 语言运行库。为使用 Kotlin 编写的现代模组（如本模组）提供必要的运行环境支持。`Continuous` 版本修复了新版 Java 环境下的兼容性问题。
-
+- **版本**:2.3.20.0
 ---
 
 *(以下内容整理自上游官方 README，仅作为基础功能参考，部分特性可能与本 1.12.2 移植版存在差异)*
