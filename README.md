@@ -112,7 +112,7 @@ repo:wssessapple-ux/TACZ-Legacy
 
 该脚本会将日志输出到 `build/smoke‑tests/`，并在以下任一条件满足时判定通过：
 - 在超时前到达 `FoundationSmoke` + `Forge Mod Loader has successfully loaded` 启动完成标记
-- 命中标记后脚本会自动关闭客户端并返回，不会一直卡住控制台
+- 命中标记后脚本会自动关闭客户端并返回，不会一直卡住控制台.
 
 这适合做“能否成功启动到真实 MC 环境”的回归验证；若要验证具体玩法链路（射击、换弹、工作台等），建议在此基础上继续补更细的交互脚本或集成测试。
 
