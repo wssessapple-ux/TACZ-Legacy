@@ -4,18 +4,13 @@
 ### ⚠️ 非官方移植构建版重要声明
 本项目为社区非官方移植构建，与原作者及官方 TaCZ 项目无关！
 本模组是基于 KasumiNova（TaCZ Team）开发的《永恒枪械工坊：零 (TaCZ)》源码，针对 **Minecraft 1.12.2** 版本的非官方移植构建。原作者从未发布过针对 1.12.2 的正式构建版本。
-项目已同步提交 CurseForge 审核
+
 - 源码版权归原作者及上游 TaCZ 项目所有，本项目遵循 **GPL‑3.0** 协议开源。
 - 本构建未修改任何核心逻辑，仅提供版本适配构建。
 - 请勿用于商业用途、勿向原项目反馈本版问题、勿冒充官方传播。
 🔍 快速找到本仓库
-1. 完整直链（100%命中，推荐）：
-https://github.com/wssessapple-ux/TACZ-Legacy
-2. GitHub搜索‑包含分叉结果
-TACZ‑Legacy fork:true
-3. 精确寻址搜索
-repo:wssessapple-ux/TACZ-Legacy
-
+  项目已同步提交 CurseForge 
+📥 Download on CurseForge: https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
 ---
 
 ### 📦 版本与构建信息
