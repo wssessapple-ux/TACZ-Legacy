@@ -11,8 +11,8 @@
   
   项目已同步提交 CurseForge 
 📥 Download on CurseForge: https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
+📥 CurseForge 下载地址： https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
 ---
-
 ### 📦 版本与构建信息
 - **游戏版本**：Minecraft 1.12.2 (Forge)
 - **模组版本**：0.1.0 Beta (Unofficial)
