@@ -47,7 +47,7 @@
 - 第三人称渲染异常、音效故障
 - 性能问题（帧率下降、内存占用偏高）
 
-更多细节和最新进展，请见 Issues 页面。
+更多细节和最新进展，请见 Discussions  页面。
 
 ---
 
@@ -86,7 +86,15 @@
 - 如需要提交源代码层面的功能补丁，欢迎提交 PR 或向本仓库反馈。
 
 ---
+### 🤖 AI 辅助开发声明
 
+本项目的部分 Bug 修复（包括 Mixin 失效修复、后坐力重构等）在开发过程中使用了 AI 工具（豆包）进行代码分析、提供修改思路和代码片段辅助。
+
+**但请注意：**
+- 所有 AI 提供的代码和修改方案，均由维护者（wssessapple-ux）**在游戏内实测验证通过后**才合并到官方版本。
+- 核心移植架构和最终版本发布由人工完成。
+
+  
 ### 📌 项目状态
 
 目前处于**低频维护**阶段。学业期间更新较慢，但会持续处理社区反馈和关键 bug 修复。寒暑假期间会有集中更新。感谢理解与支持！
@@ -113,11 +121,61 @@
 
 ---
 
-## 快速开始
+# 开发者编译指南
 
-1. 初始化反编译工作区：`gradlew setupDecompWorkspace`
-2. 导入/刷新 Gradle 工程（IDEA）
-3. 运行开发环境：`gradlew runClient` / `gradlew runServer`
+## 环境准备
+
+
+
+* JDK 8（用于编译模组代码）
+
+* JDK 21（用于运行 Gradle 进程，RFG 1.4.9 强制要求）
+
+* 推荐使用 IntelliJ IDEA
+
+## 配置 Java 路径（必须）
+
+打开根目录的 `gradle.properties`，在文件末尾添加以下内容（注意修改为你电脑上的实际安装路径）：
+
+
+
+```
+org.gradle.java.home=C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot
+org.gradle.java.installations.paths=C:\\Program Files\\Eclipse Adoptium\\jdk-8.0.504.1-hotspot
+```
+
+## 配置 Gradle 镜像（国内网络必须）
+
+打开 `gradle/wrapper/gradle-wrapper.properties`，将 `distributionUrl` 替换为国内镜像，否则会报 SSL 证书错误：
+
+
+
+```
+distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-8.1.1-bin.zip
+```
+
+## 修复依赖与工具链
+
+打开 `build.gradle.kts`，做以下两处修改：
+
+
+
+1. 将第 19 行的 `id("com.gtnewhorizons.retrofuturagradle") version "1.3.34"` 改为 `"1.4.9"`（旧版已被仓库移除）。
+
+2. 在 `java { toolchain { ... } }` 代码块中，将 `vendor.set(JvmVendorSpec.AZUL)` 改为 `vendor.set(JvmVendorSpec.ADOPTIUM)`。
+
+## 开始构建
+
+执行以下命令：
+
+
+
+```
+gradlew.bat setupDecompWorkspace
+gradlew.bat build
+```
+
+构建成功的 JAR 文件将生成在 `build/libs/` 目录下。
 
 ### 自动化烟雾测试
 
@@ -153,4 +211,4 @@
 
 - [KasumiNova](https://github.com/KasumiNova)：上游 TACZ-Legacy 原始仓库作者
 - [wssessapple-ux](https://github.com/wssessapple-ux)：Minecraft 1.12.2-Forge 构建发行者
-- **BH_wueif**：社区分析报告，为本版修复提供了思路参考（Mixin 失效、后坐力）
+- **BH_wueif**：为本版修复提供了思路参考（Mixin 失效、后坐力）
