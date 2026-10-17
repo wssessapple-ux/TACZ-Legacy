@@ -16,12 +16,29 @@ import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction
 
 @SideOnly(Side.CLIENT)
 internal object TACZCameraRecoilHandler {
+private const val SAMPLE_STEP_MILLIS = 5.0
+
+private fun peakOf(spline: PolynomialSplineFunction?): Double {
+    if (spline == null) return 0.0
+    val knots = spline.knots
+    val start = knots.first()
+    val end = knots.last()
+    if (!start.isFinite() || !end.isFinite() || end <= start) return 0.0
+    var peak = 0.0
+    var t = start
+    while (t <= end) {
+        val v = runCatching { spline.value(t) }.getOrNull() ?: 0.0
+        if (kotlin.math.abs(v) > kotlin.math.abs(peak)) peak = v
+        t += SAMPLE_STEP_MILLIS
+    }
+    return peak
+}
     private var pitchSplineFunction: PolynomialSplineFunction? = null
     private var yawSplineFunction: PolynomialSplineFunction? = null
     private var shootTimestamp: Long = -1L
     private var lastLoggedShootTimestamp: Long = -1L
-    private var previousPitchOffset: Double = 0.0
-    private var previousYawOffset: Double = 0.0
+    
+
 
     @JvmStatic
     internal fun onLocalGunFire(player: EntityPlayerSP, stack: ItemStack) {
@@ -38,8 +55,9 @@ internal object TACZCameraRecoilHandler {
         pitchSplineFunction = recoil.pitch
         yawSplineFunction = recoil.yaw
         shootTimestamp = System.currentTimeMillis()
-        previousPitchOffset = 0.0
-        previousYawOffset = 0.0
+        player.rotationPitch -= peakOf(pitchSplineFunction).toFloat()
+player.rotationYaw -= peakOf(yawSplineFunction).toFloat()
+      
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
@@ -53,37 +71,43 @@ internal object TACZCameraRecoilHandler {
         val elapsed = System.currentTimeMillis() - shootTimestamp
         val elapsedMs = elapsed.toDouble()
 
-        var pitch = event.pitch
-        var appliedPitchDelta = 0.0
-        pitchSplineFunction?.takeIf { it.isValidPoint(elapsedMs) }?.let { spline ->
-            val value = spline.value(elapsedMs)
-            appliedPitchDelta = value - previousPitchOffset
-            pitch -= appliedPitchDelta.toFloat()
-            previousPitchOffset = value
-        }
+        
+    var pitch = event.pitch
+var appliedPitchOffset = 0.0
+pitchSplineFunction?.takeIf { it.isValidPoint(elapsedMs) }?.let { spline ->
+    val value = spline.value(elapsedMs)
+    appliedPitchOffset = value
+    pitch -= value.toFloat()
+}
 
+       
+            
+           
+            
+ 
         var yaw = event.yaw
-        var appliedYawDelta = 0.0
-        yawSplineFunction?.takeIf { it.isValidPoint(elapsedMs) }?.let { spline ->
-            val value = spline.value(elapsedMs)
-            appliedYawDelta = value - previousYawOffset
-            yaw -= appliedYawDelta.toFloat()
-            previousYawOffset = value
-        }
+var appliedYawOffset = 0.0
+yawSplineFunction?.takeIf { it.isValidPoint(elapsedMs) }?.let { spline ->
+    val value = spline.value(elapsedMs)
+    appliedYawOffset = value
+    yaw -= value.toFloat()
+}
+
+        
 
         if (System.getProperty("tacz.focusedSmoke", "false").toBoolean()
-            && shootTimestamp > 0L
-            && lastLoggedShootTimestamp != shootTimestamp
-            && (kotlin.math.abs(appliedPitchDelta) > 1.0E-4 || kotlin.math.abs(appliedYawDelta) > 1.0E-4)
-        ) {
-            lastLoggedShootTimestamp = shootTimestamp
-            com.tacz.legacy.TACZLegacy.logger.info(
-                "[FocusedSmoke] CAMERA_RECOIL_APPLIED shootTimestamp={} pitchDelta={} yawDelta={}",
-                shootTimestamp,
-                "%.3f".format(appliedPitchDelta),
-                "%.3f".format(appliedYawDelta),
-            )
-        }
+    && shootTimestamp > 0L
+    && lastLoggedShootTimestamp != shootTimestamp
+    && (kotlin.math.abs(appliedPitchOffset) > 1.0E-4 || kotlin.math.abs(appliedYawOffset) > 1.0E-4)
+) {
+    lastLoggedShootTimestamp = shootTimestamp
+    com.tacz.legacy.TACZLegacy.logger.info(
+        "[FocusedSmoke] CAMERA_RECOIL_APPLIED shootTimestamp={} pitchOffset={} yawOffset={}",
+        shootTimestamp,
+        "%.3f".format(appliedPitchOffset),
+        "%.3f".format(appliedYawOffset),
+    )
+}
 
         event.pitch = pitch
         event.yaw = yaw
