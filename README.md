@@ -113,40 +113,61 @@
 
 ---
 
-## 🛠️ 开发者编译指南（如何自行构建）
+# 开发者编译指南
 
-如果你想从源码自行编译本项目，请注意：由于网络环境和依赖版本变化，直接运行会报错。请务必按以下步骤配置环境：
+## 环境准备
 
-### 1. 环境准备
-- **JDK 8**（用于编译模组代码）
-- **JDK 21**（用于运行 Gradle 进程，RFG 1.4.9 强制要求）
-- 推荐使用 IntelliJ IDEA
 
-### 2. 配置 Java 路径（必须）
+
+* JDK 8（用于编译模组代码）
+
+* JDK 21（用于运行 Gradle 进程，RFG 1.4.9 强制要求）
+
+* 推荐使用 IntelliJ IDEA
+
+## 配置 Java 路径（必须）
+
 打开根目录的 `gradle.properties`，在文件末尾添加以下内容（注意修改为你电脑上的实际安装路径）：
-```properties
+
+
+
+```
 org.gradle.java.home=C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot
 org.gradle.java.installations.paths=C:\\Program Files\\Eclipse Adoptium\\jdk-8.0.504.1-hotspot
-3. 配置 Gradle 镜像（国内网络必须）
-打开 gradle/wrapper/gradle-wrapper.properties，将 distributionUrl 替换为国内镜像，否则会报 SSL 证书错误：
+```
 
-properties
-distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.1.1-bin.zip
-4. 修复依赖与工具链
-打开 build.gradle.kts，做以下两处修改：
+## 配置 Gradle 镜像（国内网络必须）
 
-将第 19 行的 id("com.gtnewhorizons.retrofuturagradle") version "1.3.34" 改为 "1.4.9"（旧版已被仓库移除）。
+打开 `gradle/wrapper/gradle-wrapper.properties`，将 `distributionUrl` 替换为国内镜像，否则会报 SSL 证书错误：
 
-在 java { toolchain { ... } } 代码块中，将 vendor.set(JvmVendorSpec.AZUL) 改为 vendor.set(JvmVendorSpec.ADOPTIUM)（避免自动下载 Azul JDK 失败）。
 
-5. 开始构建
-bash
-# 初始化反编译工作区（首次需下载大量依赖，耗时较长）
+
+```
+distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-8.1.1-bin.zip
+```
+
+## 修复依赖与工具链
+
+打开 `build.gradle.kts`，做以下两处修改：
+
+
+
+1. 将第 19 行的 `id("com.gtnewhorizons.retrofuturagradle") version "1.3.34"` 改为 `"1.4.9"`（旧版已被仓库移除）。
+
+2. 在 `java { toolchain { ... } }` 代码块中，将 `vendor.set(JvmVendorSpec.AZUL)` 改为 `vendor.set(JvmVendorSpec.ADOPTIUM)`。
+
+## 开始构建
+
+执行以下命令：
+
+
+
+```
 gradlew.bat setupDecompWorkspace
-
-# 编译打包
 gradlew.bat build
-构建成功的 JAR 文件将生成在 build/libs/ 目录下。
+```
+
+构建成功的 JAR 文件将生成在 `build/libs/` 目录下。
 
 ### 自动化烟雾测试
 
