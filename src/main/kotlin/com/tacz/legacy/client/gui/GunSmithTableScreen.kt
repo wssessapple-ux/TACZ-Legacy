@@ -1,4 +1,4 @@
-package com.tacz.legacy.client.gui
+﻿package com.tacz.legacy.client.gui
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.client.foundation.TACZAsciiFontHelper
@@ -197,7 +197,7 @@ internal class GunSmithTableScreen(
                 selectedType = tab.id
                 indexPage = 0
                 selectedRecipe = null
-                refreshRecipeState(preserveSelection = false)
+                refreshRecipeState(preserveSelection = true)
                 rebuildWidgets()
             }
             button.id in BUTTON_RESULT_BASE until BUTTON_PACK_BASE -> {
@@ -334,12 +334,10 @@ internal class GunSmithTableScreen(
         tabButtons.clear()
         resultButtons.clear()
 
-        addButton(FlatButton(BUTTON_FILTER, guiLeft - 10, guiTop, 12, 12, "F", tooltipLines = listOf(I18n.format("gui.tacz.gun_smith_table.filter"))))
-        addButton(TexturedButton(BUTTON_TYPE_PREV, guiLeft + 136, guiTop + 4, 18, 20, 0, 162, tooltipLines = listOf(I18n.format("tooltip.tacz.page.previous"))))
-        addButton(TexturedButton(BUTTON_TYPE_NEXT, guiLeft + 327, guiTop + 4, 18, 20, 20, 162, tooltipLines = listOf(I18n.format("tooltip.tacz.page.next"))))
-        addButton(TexturedButton(BUTTON_RESULT_PREV, guiLeft + 143, guiTop + 56, 96, 6, 40, 166, tooltipLines = listOf(I18n.format("tooltip.tacz.page.previous"))))
-        addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6, 40, 186, tooltipLines = listOf(I18n.format("tooltip.tacz.page.next"))))
-        addButton(TexturedButton(BUTTON_CRAFT, guiLeft + 289, guiTop + 162, 48, 18, 138, 164))
+        addButton(TexturedButton(BUTTON_TYPE_PREV, guiLeft + 136, guiTop + 4, 18, 20, 0, 162, tooltipLines = listOf(I18n.format("tooltip.tacz.page.previous"))).also { it.enabled = typePage > 0 })
+addButton(TexturedButton(BUTTON_TYPE_NEXT, guiLeft + 327, guiTop + 4, 18, 20, 20, 162, tooltipLines = listOf(I18n.format("tooltip.tacz.page.next"))).also { it.enabled = typePage < ((visibleTabs.size - 1).coerceAtLeast(0) / TABS_PER_PAGE) })
+addButton(TexturedButton(BUTTON_RESULT_PREV, guiLeft + 143, guiTop + 56, 96, 6, 40, 166, tooltipLines = listOf(I18n.format("tooltip.tacz.page.previous"))).also { it.enabled = indexPage > 0 })
+addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6, 40, 186, tooltipLines = listOf(I18n.format("tooltip.tacz.page.next"))).also { it.enabled = indexPage < ((selectedRecipeList.size - 1).coerceAtLeast(0) / RESULTS_PER_PAGE) })
 
         if (filterPanelVisible) {
             addButton(

@@ -25,7 +25,7 @@ plugins {
     id("maven-publish")
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.1.7"
     id("eclipse")
-    id("com.gtnewhorizons.retrofuturagradle") version "1.3.34"
+    id("com.gtnewhorizons.retrofuturagradle") version "1.4.9"
     id("com.matthewprenger.cursegradle") version "1.4.0"
 }
 
@@ -64,7 +64,7 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
         // Azul covers the most platforms for Java 8 toolchains, crucially including MacOS arm64
-        vendor.set(JvmVendorSpec.AZUL)
+        vendor.set(JvmVendorSpec.ADOPTIUM)
     }
     // Generate sources and javadocs jars when building and publishing
     withSourcesJar()

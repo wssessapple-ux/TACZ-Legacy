@@ -1,4 +1,4 @@
-package com.tacz.legacy.common.entity
+﻿package com.tacz.legacy.common.entity
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.event.EntityHurtByGunEvent
@@ -569,7 +569,7 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         motionX *= (1.0 - frictionFactor)
         motionY *= (1.0 - frictionFactor)
         motionZ *= (1.0 - frictionFactor)
-        motionY -= gravityValue
+        motionY -= gravityValue * 0.05F
 
         // ---- 寿命检查 ----
         lifespan--

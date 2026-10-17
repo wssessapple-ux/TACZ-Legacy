@@ -1,4 +1,4 @@
-package com.tacz.legacy.client.renderer.item
+﻿package com.tacz.legacy.client.renderer.item
 
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.client.model.BedrockAnimatedModel
@@ -122,7 +122,7 @@ internal object TACZGunItemRenderer : TileEntityItemStackRenderer() {
         Minecraft.getMinecraft().textureManager.bindTexture(registeredTexture)
 
         GlStateManager.pushMatrix()
-        GlStateManager.translate(0.5f, 2.0f, 0.5f)
+        GlStateManager.translate(0.3f, 1.5f, 0.3f)
         GlStateManager.scale(-1f, -1f, 1f)
 
         GlStateManager.enableLighting()
