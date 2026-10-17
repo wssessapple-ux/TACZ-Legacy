@@ -20,21 +20,18 @@ public abstract class ModelBipedGunPoseMixin {
         EntityLivingBase living = (EntityLivingBase) entityIn;
         ItemStack mainHand = living.getHeldItemMainhand();
         
-        // 只有手里拿的是 TACZ 枪械时，才覆盖手臂动画
+        // Check if holding a TACZ gun
         if (!mainHand.isEmpty() && mainHand.getItem() instanceof IGun) {
             ModelBiped model = (ModelBiped) (Object) this;
             ModelRenderer rightArm = model.bipedRightArm;
             ModelRenderer leftArm = model.bipedLeftArm;
 
-            // 这里的角度使用的是弧度制 (Math.toRadians)
-            // 1.12.2 的模型坐标系中，手臂自然下垂是 0。负数代表向上抬起。
-
-            // 右手握枪（向胸前抬起，微调向内）
+            // Right hand holds the grip
             rightArm.rotateAngleX = (float) Math.toRadians(-75); 
             rightArm.rotateAngleY = (float) Math.toRadians(-15); 
             rightArm.rotateAngleZ = (float) Math.toRadians(0);
 
-            // 左手托护木（向前伸，跨过身体中线）
+            // Left hand supports the handguard
             leftArm.rotateAngleX = (float) Math.toRadians(-85);
             leftArm.rotateAngleY = (float) Math.toRadians(35); 
             leftArm.rotateAngleZ = (float) Math.toRadians(-10);
