@@ -5,17 +5,18 @@
 📢 如果这个项目帮到了你，请点右上角 ⭐ Star 支持一下！你的每一次 Star 都是让更多玩家看到 1.12.2 唯一 TaCZ 的机会！
 
 📥 **Download on CurseForge:** https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
+📥 **Download on Modrinth:** https://modrinth.com/mod/tacz-legacy
 
 ---
 
 ### ⚠️ 非官方移植构建版重要声明
 
-本项目为社区非官方移植构建，与原作者及官方 TaCZ 项目无关！
+本项目为社区非官方移植构建，与原作者及官方 TaCZ 项目无关。
 
-本模组是基于 KasumiNova（TaCZ Team）开发的《永恒枪械工坊：零 (TaCZ)》源码，针对 **Minecraft 1.12.2** 版本的非官方移植构建。原作者从未发布过针对 1.12.2 的正式构建版本。
+本模组基于 KasumiNova（TaCZ Team）开发的《永恒枪械工坊：零 (TaCZ)》源码，针对 **Minecraft 1.12.2** 版本进行非官方移植和维护。原作者从未发布过针对 1.12.2 的正式构建版本。
 
-- 源码版权归原作者及上游 TaCZ 项目所有，本项目遵循 **GPL‑3.0** 协议开源。
-- **当前版本已包含社区贡献的 bug 修复和兼容性改进**，不再只是原样编译。
+- 源码版权归原作者及上游 TaCZ 项目所有，本项目遵循 **GPL-3.0** 协议开源。
+- **当前版本已包含自行修复的 bug 和改进**，不再只是原样编译。
 - 请勿用于商业用途、勿向原项目反馈本版问题、勿冒充官方传播。
 
 ---
@@ -25,15 +26,28 @@
 - **游戏版本**：Minecraft 1.12.2 (Forge)
 - **模组版本**：0.2.0 Beta (Unofficial)
 - **Java 版本**：Java 8
-- **构建可验证性**：发布版 JAR 的 SHA‑256 哈希值将在每次发布时更新。
+- **构建可验证性**：发布版 JAR 的 SHA-256 哈希值将在每次发布时更新。
 
 ---
 
-### 🛠️ 已知问题
+### 🛠️ 已知问题与修复进展
 
-- **部分瞄具/倍镜视角黑屏**：已部分修复。安装 **Actinium**（Alpha 版）可修复更多倍镜。请勿与 **BetterFPS** 同时使用，两者会冲突。
-- **后坐力**：已修复，连发时视角会上爬，需压枪。
-- **Mixin 失效**：已修复，所有 mixin 已正常生效。
+**本版已修复/缓解的问题：**
+
+- **Mixin 失效**：已移除 `TransformerExclusions`，所有 mixin 现在能正常生效。
+- **后坐力**：已改为“绝对偏移 + 峰值施加”，连发时视角会上爬，需压枪。
+- **部分瞄具/倍镜视角黑屏**：已部分缓解。安装 **Actinium**（Alpha 版）可修复更多倍镜。请勿与 **BetterFPS** 同时使用，两者会冲突。
+
+**完整已知问题列表请查看 [GitHub Issues](https://github.com/wssessapple-ux/TACZ-Legacy/issues)。**
+
+**仍存在的问题（部分列举）：**
+
+- 工作台配方缺失、切换枪械种类按钮失效
+- 泵动式霰弹枪生存模式装填中断
+- 第三人称渲染异常、音效故障
+- 性能问题（帧率下降、内存占用偏高）
+
+更多细节和最新进展，请见 Issues 页面。
 
 ---
 
@@ -42,40 +56,44 @@
 本模组依赖以下两个前置模组，已随本发布版一同提供：
 
 **1. MixinBooter**
-- **作者**：Rongmario (及 CleanroomMC 团队维护)
+- **作者**：Rongmario（及 CleanroomMC 团队维护）
 - **作用**：专为 1.12.2 等老版本设计的核心库，用于引导和加载 Mixin。
-- **版本**: 10.7
+- **版本**：10.7
 
-**2. Forgelin‑Continuous**
+**2. Forgelin-Continuous**
 - **作者**：Community / Continuity Maintainers
 - **作用**：Kotlin 语言运行库。为使用 Kotlin 编写的现代模组提供必要的运行环境支持。
-- **版本**: 2.3.20.0
+- **版本**：2.3.20.0
 
 ---
 
-*(以下内容整理自上游官方 README，仅作为基础功能参考，部分特性可能与本 1.12.2 移植版存在差异)*
-
 ### 🚧 项目边界说明
 
-本仓库维护 Minecraft 1.12.2‑Forge 的非官方构建：
+本仓库维护 Minecraft 1.12.2-Forge 的非官方构建：
 
-- ✅ **工作范围**：工程构建、环境适配、打包发布、bug 修复、社区贡献合并。
-- ❌ **不工作范围**：上游模组核心业务代码开发。如果你想要原版新功能，请前往上游仓库 [KasumiNova/TACZ‑Legacy](https://github.com/KasumiNova/TACZ‑Legacy)。
+- ✅ **工作范围**：工程构建、环境适配、打包发布、bug 修复、社区反馈处理。
+- ❌ **不工作范围**：上游模组核心业务代码开发。如果你想要原版新功能，请前往上游仓库 [KasumiNova/TACZ-Legacy](https://github.com/KasumiNova/TACZ-Legacy)。
 
 ---
 
 ### 📝 问题反馈指引
 
 - Bug 反馈请使用仓库的 Issue 模板提交，请尽可能附上游戏日志、版本信息、复现步骤。
-- 安装、配置、使用类求助请到 **Discussions** 讨论区，不要在 Issue 下灌水。
-- 上游原始代码产生的缺陷（例如瞄具黑屏）请不要向 KasumiNova 的上游仓库提交反馈。
-- 本仓库为 KasumiNova/TACZ‑Legacy 上游源码的编译分发仓库。
-- 上游项目许可证：GPL‑3.0，本分发项目同样以 GPL‑3.0 开源。
+- 安装、配置、使用类求助请到 **Discussions** 讨论区。
+- 上游原始代码产生的缺陷请不要向 KasumiNova 的上游仓库提交反馈。
+- 本仓库为 KasumiNova/TACZ-Legacy 上游源码的编译分发仓库。
+- 上游项目许可证：GPL-3.0，本分发项目同样以 GPL-3.0 开源。
 - 如需要提交源代码层面的功能补丁，欢迎提交 PR 或向本仓库反馈。
 
 ---
 
-`TACZ‑Legacy` 是 `TACZ` 的 **Minecraft 1.12.2 Forge 移植工程**，并采用 **Kotlin + RetroFuturaGradle** 技术栈。
+### 📌 项目状态
+
+目前处于**低频维护**阶段。学业期间更新较慢，但会持续处理社区反馈和关键 bug 修复。寒暑假期间会有集中更新。感谢理解与支持！
+
+---
+
+`TACZ-Legacy` 是 `TACZ` 的 **Minecraft 1.12.2 Forge 移植工程**，并采用 **Kotlin + RetroFuturaGradle** 技术栈。
 
 ## 项目目标
 
@@ -89,7 +107,7 @@
 ## 技术栈
 
 - Minecraft Forge `1.12.2`（`14.23.5.2847`）
-- Kotlin（Forgelin‑Continuous）
+- Kotlin（Forgelin-Continuous）
 - RetroFuturaGradle
 - Sponge Mixin（通过 MixinBooter 接入）
 
@@ -113,7 +131,7 @@
 - 项目总览：`PROJECT_OVERVIEW.md`
 - 迁移蓝图：`docs/MIGRATION_PLAN.md`
 - 架构与渲染蓝图：`docs/ARCHITECTURE_BOUNDARY_AND_RENDER_PIPELINE.md`
-- Copilot 协作指引：`.github/copilot‑instructions.md`
+- Copilot 协作指引：`.github/copilot-instructions.md`
 
 ---
 
@@ -133,6 +151,6 @@
 
 #### 👥 贡献者
 
-- [KasumiNova](https://github.com/KasumiNova)：上游 TACZ‑Legacy 原始仓库作者
-- [wssessapple‑ux](https://github.com/wssessapple‑ux)：Minecraft 1.12.2‑Forge 构建发行者
-- **BH_wueif**：社区修复贡献者（Mixin 失效、后坐力等）
+- [KasumiNova](https://github.com/KasumiNova)：上游 TACZ-Legacy 原始仓库作者
+- [wssessapple-ux](https://github.com/wssessapple-ux)：Minecraft 1.12.2-Forge 构建发行者
+- **BH_wueif**：社区分析报告，为本版修复提供了思路参考（Mixin 失效、后坐力）
