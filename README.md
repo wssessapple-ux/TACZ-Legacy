@@ -38,7 +38,7 @@
 - **后坐力**：已改为“绝对偏移 + 峰值施加”，连发时视角会上爬，需压枪。
 - **部分瞄具/倍镜视角黑屏**：已部分缓解。安装 **Actinium**（Alpha 版）可修复更多倍镜。请勿与 **BetterFPS** 同时使用，两者会冲突。
 
-**完整已知问题列表请查看 [GitHub Issues](https://github.com/wssessapple-ux/TACZ-Legacy/issues)。**
+**完整已知问题列表请查看 [GitHub Issues](https://github.com/wssessapple-ux/TACZ-Legacy/discussions)。**
 
 **仍存在的问题（部分列举）：**
 
