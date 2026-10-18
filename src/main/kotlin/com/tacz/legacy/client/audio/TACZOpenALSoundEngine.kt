@@ -113,9 +113,11 @@ internal object TACZOpenALSoundEngine {
         cleanupFinishedSources()
         trimOldestSourceIfNeeded()
 
-        AL10.alGetError()
-        val sourceId = AL10.alGenSources()
-        if (AL10.alGetError() != AL10.AL_NO_ERROR) {
+        // 分配音源通道。OpenAL 通道耗尽时 alGenSources 会失败，
+        // 这里先清理已播完/最老的声源再重试，确保当前枪声一定能响。
+        val sourceId = allocateSourceGuaranteed()
+        if (sourceId == 0) {
+            TACZLegacy.logger.warn(MARKER, "OpenAL source allocation failed after cleanup for {}", soundId)
             return null
         }
 
@@ -351,6 +353,35 @@ internal object TACZOpenALSoundEngine {
         }
         val oldest = activeSources.firstOrNull() ?: return
         stopSource(oldest)
+    }
+
+    /**
+     * 分配一个 OpenAL 音源通道。如果设备通道耗尽（alGenSources 报错），
+     * 逐次强制释放自己管理的最老声源并重试，直到成功或确实无源可释放。
+     * 保证当前最重要的枪声优先获得通道，而不是被静默丢弃。
+     */
+    private fun allocateSourceGuaranteed(): Int {
+        while (true) {
+            AL10.alGetError()
+            val sourceId = AL10.alGenSources()
+            if (AL10.alGetError() == AL10.AL_NO_ERROR) {
+                return sourceId
+            }
+            if (sourceId != 0) {
+                // 个别驱动会返回非 0 但同时设置错误标志，这里兜底防源泄漏
+                runCatching { AL10.alDeleteSources(sourceId) }
+            }
+            // 先清掉已播放完的声源，再强制释放最老的一个
+            cleanupFinishedSources()
+            val oldest = activeSources.firstOrNull()
+            if (oldest == null) {
+                // 已没有自己管理的源可释放，做最后一次尝试
+                AL10.alGetError()
+                val lastChance = AL10.alGenSources()
+                return if (AL10.alGetError() == AL10.AL_NO_ERROR) lastChance else 0
+            }
+            stopSource(oldest)
+        }
     }
 
     private fun cleanupFinishedSources() {
