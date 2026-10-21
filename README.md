@@ -6,7 +6,7 @@
 
 📥 **Download on CurseForge:** https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
 📥 **Download on Modrinth:** https://modrinth.com/mod/tacz-legacy
-
+⚠️ 【紧急通知】CurseForge 上的 0.1.0 为早期未修复版，存在高倍镜黑屏、卡服等严重问题！真正的修复版（0.2.0/0.3.0）目前正在 CF 排队审核中。想提前体验修复版的玩家，请前往 GitHub Releases 下载！
 ---
 
 ### ⚠️ 非官方移植构建版重要声明
