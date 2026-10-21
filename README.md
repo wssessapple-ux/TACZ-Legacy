@@ -80,7 +80,7 @@
 本仓库维护 Minecraft 1.12.2-Forge 的非官方构建：
 
 - ✅ **工作范围**：工程构建、环境适配、打包发布、bug 修复、社区反馈处理。
-- ❌ **不工作范围**：上游模组核心业务代码开发。如果你想要原版新功能，请前往上游仓库 [KasumiNova/TACZ-Legacy](https://github.com/KasumiNova/TACZ-Legacy)。
+- ❌ **不工作范围**：上游模组核心业务代码开发。如果你想要原版新功能，请前往上游仓库KasumiNova 的原始 TACZ 仓库 [KasumiNova/TACZ-Legacy](https://github.com/KasumiNova/TACZ-Legacy)。
 
 ---
 
