@@ -8,7 +8,7 @@
 
 📥 **Download on Modrinth:** https://modrinth.com/mod/tacz-legacy
 
-真正的修复版 (0.2.0/0.3.0) 已在 CurseForge 上架，请前往下载！想提前体验最新内测版的玩家，请前往 GitHub Releases 下载！
+⚠️ **紧急通知：0.1.0 为早期纯编译版，未修复任何 Bug（高倍镜黑屏、服务器卡顿等）真正的修复版 (0.2.0/0.3.0) 已在 CurseForge 上架，请前往下载！想提前体验最新内测版的玩家，请前往 GitHub Releases 下载！
 ---
 
 ### ⚠️ 非官方移植构建版重要声明
