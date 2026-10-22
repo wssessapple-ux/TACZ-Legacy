@@ -1,4 +1,4 @@
-package com.tacz.legacy.client.gameplay
+﻿package com.tacz.legacy.client.gameplay
 
 import com.tacz.legacy.api.entity.IGunOperator
 import com.tacz.legacy.api.entity.ShootResult
@@ -41,6 +41,16 @@ import java.util.concurrent.atomic.AtomicInteger
 internal object LegacyClientShootCoordinator {
     private var clientShootTimestampMs: Long = -1L
     private var clientLastShootTimestampMs: Long = -1L
+    private var lastSyncReplyTimestamp: Long = 0L
+
+    internal fun throttleSyncReply(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastSyncReplyTimestamp >= 1500L) {
+            lastSyncReplyTimestamp = now
+            return true
+        }
+        return false
+    }
 
     private val scheduledExecutor = Executors.newScheduledThreadPool(1) { runnable ->
         Thread(runnable, "TACZ-ClientShootScheduler").also { it.isDaemon = true }

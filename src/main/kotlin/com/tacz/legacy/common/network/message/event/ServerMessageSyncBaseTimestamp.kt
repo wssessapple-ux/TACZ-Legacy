@@ -1,4 +1,4 @@
-package com.tacz.legacy.common.network.message.event
+﻿package com.tacz.legacy.common.network.message.event
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.client.gameplay.LegacyClientShootCoordinator
@@ -33,9 +33,13 @@ public class ServerMessageSyncBaseTimestamp : IMessage {
                 LegacyClientShootCoordinator.resetTiming()
                 TACZLegacy.logger.debug("Sync client baseTimestamp: {}", receiveTimestamp)
             }
-            // 立即回复确认（在网络线程上）
-            TACZNetworkHandler.sendToServer(ClientMessageSyncBaseTimestamp())
-            return null
+        // 回发确认挪到主线程，并做 1.5s 节流，避免与服务器同步风暴联动
+        mc.addScheduledTask {
+            if (LegacyClientShootCoordinator.throttleSyncReply()) {
+                TACZNetworkHandler.sendToServer(ClientMessageSyncBaseTimestamp())
+            }
+        }
+        return null
         }
     }
 }

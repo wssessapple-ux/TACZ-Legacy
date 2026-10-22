@@ -154,11 +154,23 @@ internal object LegacyGunSmithingRuntime {
 
     fun craft(player: EntityPlayer, blockId: ResourceLocation, recipeId: ResourceLocation): ItemStack? {
         val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
-        val recipe = recipes(snapshot)[recipeId] ?: return null
-        if (!isVisibleForWorkbench(recipe, blockId, snapshot = snapshot)) {
+        val recipe = recipes(snapshot)[recipeId]
+        if (recipe == null) {
+            TACZLegacy.logger.warn("GunSmith craft ignored: recipe {} not found or disabled (likely unresolved material)", recipeId)
             return null
         }
-        val plan = if (player.capabilities.isCreativeMode) emptyMap() else buildConsumptionPlan(player, recipe) ?: return null
+        if (!isVisibleForWorkbench(recipe, blockId, snapshot = snapshot)) {
+            TACZLegacy.logger.warn("GunSmith craft ignored: recipe {} not visible on block {}", recipeId, blockId)
+            return null
+        }
+        val plan = if (player.capabilities.isCreativeMode) emptyMap() else buildConsumptionPlan(player, recipe)
+        if (plan == null) {
+            TACZLegacy.logger.warn(
+                "GunSmith craft failed: recipe {} materials not satisfied. NOTE: materials are consumed from PLAYER INVENTORY (backpack), not GUI slots. materials={}",
+                recipeId, recipe.materials
+            )
+            return null
+        }
         applyConsumptionPlan(player, plan)
         val output = recipe.result.copy()
         if (!player.world.isRemote) {
@@ -186,6 +198,12 @@ internal object LegacyGunSmithingRuntime {
             val materials = root.getAsJsonArray("materials")
                 ?.mapNotNull { materialElement -> parseMaterial(materialElement, context) }
                 .orEmpty()
+            // 存在无法解析的材料（如 1.16+ 物品 crying_obsidian）时，判定该配方无效并禁用，
+            // 明确记日志，而不是让它以“材料永远不匹配”的形式留在 UI 里误导玩家。
+            if (materials.any { it.ingredient == Ingredient.EMPTY }) {
+                TACZLegacy.logger.warn("GunSmith recipe {} disabled: contains unresolved material (e.g. 1.16+ item crying_obsidian) not available in 1.12.2", definition.id)
+                return@runCatching null
+            }
             LegacyGunSmithRecipe(
                 id = definition.id,
                 group = resolveResultGroup(definition.id, resultObject, result, snapshot),

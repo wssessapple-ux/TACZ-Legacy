@@ -1,4 +1,4 @@
-package com.tacz.legacy.common.entity.shooter
+﻿package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.entity.ReloadState
 import net.minecraft.item.ItemStack
@@ -30,6 +30,7 @@ public class ShooterDataHolder {
     @JvmField public var shootCount: Int = 0
     @JvmField public var isCrawling: Boolean = false
     @JvmField public var heatTimestamp: Long = -1L
+    @JvmField public var lastSyncTimestamp: Long = 0L
     @JvmField public var scriptData: Any? = null
 
     public fun initialData() {
@@ -49,6 +50,7 @@ public class ShooterDataHolder {
         sprintTimestamp = -1L
         shootCount = 0
         heatTimestamp = -1L
+        lastSyncTimestamp = 0L
         scriptData = null
     }
 }

@@ -1,4 +1,4 @@
-package com.tacz.legacy.common.entity.shooter
+﻿package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.DefaultAssets
 import com.tacz.legacy.api.entity.ShootResult
@@ -63,8 +63,13 @@ public class LivingEntityShoot(
                 alpha = now - data.baseTimestamp - timestamp
             }
             if (alpha < -300 || alpha > 600) {
-                // 时间戳偏移过大——发起双向同步握手，而不是单方面重置
-                TACZNetworkHandler.sendToPlayer(ServerMessageSyncBaseTimestamp(), shooter)
+                val nowMs = System.currentTimeMillis()
+                // 抑制窗口：1.5 秒内最多发一次同步握手，防时间戳抖动期疯狂发包
+                if (nowMs - data.lastSyncTimestamp >= 1500L) {
+                    data.lastSyncTimestamp = nowMs
+                    TACZNetworkHandler.sendToPlayer(ServerMessageSyncBaseTimestamp(), shooter)
+                }
+                // 无论是否发包，都返回 NETWORK_FAIL，让客户端回滚本地弹药
                 return ShootResult.NETWORK_FAIL
             }
         }
