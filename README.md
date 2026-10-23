@@ -226,3 +226,4 @@ gradlew.bat build
 - [KasumiNova](https://github.com/KasumiNova)：上游 TACZ-Legacy 原始仓库作者
 - [wssessapple-ux](https://github.com/wssessapple-ux)：Minecraft 1.12.2-Forge 构建发行者
 - **BH_wueif**：为本版修复提供了思路参考（Mixin 失效、后坐力）
+- **DragoWolfHunter**：反馈了子弹重力异常（霰弹枪射程问题），协助定位了物理引擎参数
