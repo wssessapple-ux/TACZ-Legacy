@@ -267,7 +267,6 @@ internal class GunSmithTableScreen(
             }
         }
         TACZAsciiFontHelper.drawString(fontRenderer, I18n.format("gui.tacz.gun_smith_table.ingredient"), 254, 50, TITLE_COLOR)
-        TACZAsciiFontHelper.drawCenteredStringWithShadow(fontRenderer, I18n.format("gui.tacz.gun_smith_table.craft"), 312, 167, 0xFFFFFF)
 
         if (selectedRecipe == null) {
             TACZAsciiFontHelper.drawString(fontRenderer, I18n.format("gui.tacz.gun_smith_table.no_matching_recipes"), 151, 67, 0xAA4444)
@@ -374,6 +373,18 @@ addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6,
             addButton(TexturedButton(BUTTON_SCALE_UP, guiLeft + 5, guiTop + 5, 10, 10, 188, 173, tooltipLines = listOf(I18n.format("gui.tacz.gun_smith_table.scale.increase"))))
             addButton(TexturedButton(BUTTON_SCALE_DOWN, guiLeft + 17, guiTop + 5, 10, 10, 200, 173, tooltipLines = listOf(I18n.format("gui.tacz.gun_smith_table.scale.decrease"))))
             addButton(TexturedButton(BUTTON_SCALE_RESET, guiLeft + 29, guiTop + 5, 10, 10, 212, 173, tooltipLines = listOf(I18n.format("gui.tacz.gun_smith_table.scale.reset"))))
+            val craftButton = FlatButton(
+                BUTTON_CRAFT,
+                guiLeft + 282,
+                guiTop + 163,
+                60,
+                16,
+                I18n.format("gui.tacz.gun_smith_table.craft"),
+            )
+            craftButton.enabled = selectedRecipe?.let { r ->
+                mc.player?.let { p -> LegacyGunSmithingRuntime.canCraft(p, r) } ?: false
+            } ?: false
+            addButton(craftButton)
             val refitButton = FlatButton(
                 BUTTON_REFIT,
                 guiLeft + 6,
@@ -453,6 +464,8 @@ addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6,
         val recipe = selectedRecipe ?: return
         val player = mc.player ?: return
         if (!LegacyGunSmithingRuntime.canCraft(player, recipe)) {
+            TACZLegacy.logger.warn("GunSmith craft blocked client-side: insufficient materials for {}", recipe.id)
+            player.sendChatMessage("Missing materials: " + recipe.result.displayName)
             return
         }
         TACZNetworkHandler.sendToServer(ClientMessageGunSmithCraft(menu.windowId, recipe.id))

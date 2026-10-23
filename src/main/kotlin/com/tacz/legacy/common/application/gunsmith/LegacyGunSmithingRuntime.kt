@@ -198,8 +198,7 @@ internal object LegacyGunSmithingRuntime {
             val materials = root.getAsJsonArray("materials")
                 ?.mapNotNull { materialElement -> parseMaterial(materialElement, context) }
                 .orEmpty()
-            // 存在无法解析的材料（如 1.16+ 物品 crying_obsidian）时，判定该配方无效并禁用，
-            // 明确记日志，而不是让它以“材料永远不匹配”的形式留在 UI 里误导玩家。
+            // Recipe disabled: contains a material not resolvable in 1.12.2 (e.g. crying_obsidian).
             if (materials.any { it.ingredient == Ingredient.EMPTY }) {
                 TACZLegacy.logger.warn("GunSmith recipe {} disabled: contains unresolved material (e.g. 1.16+ item crying_obsidian) not available in 1.12.2", definition.id)
                 return@runCatching null

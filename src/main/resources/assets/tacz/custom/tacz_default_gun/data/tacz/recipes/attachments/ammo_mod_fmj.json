@@ -2,7 +2,7 @@
   "materials": [
     {
       "item": {
-        "item": "minecraft:crying_obsidian"
+        "item": "minecraft:obsidian"
       },
       "count": 2
     },
