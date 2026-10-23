@@ -12,6 +12,7 @@
 ---
 
 **📢 Modrinth 更新延迟说明**：由于 Modrinth 官方审核排队极慢（已卡 3 周），目前最新版本（0.3.0/0.4.0）仅在 CurseForge 和 GitHub Releases 提供。请前往这两处下载，不要等 Modrinth 了！
+---
 
 ### ⚠️ 非官方移植构建版重要声明
 
