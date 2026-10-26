@@ -11,7 +11,7 @@
 ⚠️ **紧急通知：0.1.0 为早期纯编译版，未修复任何 Bug（高倍镜黑屏、服务器卡顿等）真正的修复版 (0.2.0/0.3.0) 已在 CurseForge 上架，请前往下载！想提前体验最新内测版的玩家，请前往 GitHub Releases 下载！
 ---
 
-**📢 Modrinth 更新延迟说明**：由于 Modrinth 官方审核排队极慢（已卡 3 周），目前最新版本（0.3.0/0.4.0）仅在 CurseForge 和 GitHub Releases 提供。请前往这两处下载，不要等 Modrinth 了！
+**📢 Modrinth 更新延迟说明**：由于 Modrinth 官方审核排队极慢（已卡 3 周），目前最新版本（0.3.0/0.4.0/0.5.0）仅在 CurseForge 和 GitHub Releases 提供。请前往这两处下载，不要等 Modrinth 了！
 ---
 
 ** 📢 **百科页面更新进度**：目前正在向 MC百科（mcmod.cn）官方申请开发者权限，以便直接更新百科的页面介绍和下载链接。在权限批下来之前，请大家以本 GitHub 仓库和 CurseForge 页面提供的最新版本为准（0.4.0 Beta）。感谢支持！
