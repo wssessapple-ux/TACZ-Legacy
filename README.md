@@ -32,7 +32,7 @@
 ### 📦 版本与构建信息
 
 - **游戏版本**：Minecraft 1.12.2 (Forge)
-- **模组版本**：0.4.0 Beta (Unofficial)
+- **模组版本**：0.5.0 Beta (Unofficial)
 - **Java 版本**：Java 8
 - **构建可验证性**：发布版 JAR 的 SHA-256 哈希值将在每次发布时更新。
 
