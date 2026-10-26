@@ -111,6 +111,8 @@ internal object LegacyClientShootCoordinator {
         val hasAmmoInBarrel = iGun.hasBulletInBarrel(stack) && boltType != BoltType.OPEN_BOLT
         val hasInventoryAmmo = iGun.hasInventoryAmmo(player, stack, operator.needCheckAmmo()) || hasAmmoInBarrel
         val ammoCount = iGun.getCurrentAmmoCount(stack) + (if (hasAmmoInBarrel) 1 else 0)
+        // 疾跑优先拦截：疾跑时不触发空枪/干火音效，直接不开枪
+        if (operator.getSynSprintTime() > 0f) return ShootResult.IS_SPRINTING
         val noAmmo = (useInventoryAmmo && !hasInventoryAmmo) || (!useInventoryAmmo && ammoCount < 1)
         if (noAmmo) {
             TACZClientGunSoundCoordinator.playDryFireSound(player, display)
@@ -121,9 +123,8 @@ internal object LegacyClientShootCoordinator {
             return ShootResult.OVERHEATED
         }
         if (boltType == BoltType.MANUAL_ACTION && !hasAmmoInBarrel) return ShootResult.NEED_BOLT
-        if (operator.getSynSprintTime() > 0f) return ShootResult.IS_SPRINTING
 
-        val shootEvent = GunShootEvent(player, stack, Side.CLIENT)
+        val shootEvent = GunShootEvent(player, iGun.getGunId(stack), Side.CLIENT)
         if (MinecraftForge.EVENT_BUS.post(shootEvent)) return ShootResult.FORGE_EVENT_CANCEL
 
         val now = System.currentTimeMillis()
@@ -134,7 +135,7 @@ internal object LegacyClientShootCoordinator {
         clientShootTimestampMs = now
 
         TACZNetworkHandler.sendToServer(ClientMessagePlayerShoot(pitch, yaw, relativeTimestamp))
-        val fireEvent = GunFireEvent(player, stack, Side.CLIENT)
+        val fireEvent = GunFireEvent(player, iGun.getGunId(stack), Side.CLIENT)
         val fireAccepted = !MinecraftForge.EVENT_BUS.post(fireEvent)
         if (fireAccepted) {
             var animationTriggered = false
@@ -193,7 +194,7 @@ internal object LegacyClientShootCoordinator {
                     return@scheduleAtFixedRate
                 }
                 Minecraft.getMinecraft().addScheduledTask {
-                    val fireEvent = GunFireEvent(player, stack, Side.CLIENT)
+                    val fireEvent = GunFireEvent(player, iGun.getGunId(stack), Side.CLIENT)
                     if (!MinecraftForge.EVENT_BUS.post(fireEvent)) {
                         val animationTriggered = LegacyClientGunAnimationDriver.triggerIfInitialized(stack, GunAnimationConstant.INPUT_SHOOT)
                         logFocusedSmokeShootTrigger(

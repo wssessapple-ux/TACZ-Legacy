@@ -1,58 +1,25 @@
 {
-  "overrides": [
-    {
-      "predicate": {
-        "tacz:ammo_statue": 0
-      },
-      "model": "tacz:item/ammo_box/iron_ammo_box_open"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 1
-      },
-      "model": "tacz:item/ammo_box/iron_ammo_box_close"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 2
-      },
-      "model": "tacz:item/ammo_box/gold_ammo_box_open"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 3
-      },
-      "model": "tacz:item/ammo_box/gold_ammo_box_close"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 4
-      },
-      "model": "tacz:item/ammo_box/diamond_ammo_box_open"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 5
-      },
-      "model": "tacz:item/ammo_box/diamond_ammo_box_close"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 6
-      },
-      "model": "tacz:item/ammo_box/creative_ammo_box_open"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 7
-      },
-      "model": "tacz:item/ammo_box/creative_ammo_box_close"
-    },
-    {
-      "predicate": {
-        "tacz:ammo_statue": 8
-      },
-      "model": "tacz:item/ammo_box/all_type_creative_ammo_box"
-    }
-  ]
+	"parent": "builtin/entity",
+	"display": {
+		"gui": {
+			"rotation": [0, 0, 0],
+			"translation": [0, 0, 0],
+			"scale": [1, 1, 1]
+		},
+		"ground": {
+			"translation": [0, 2, 0],
+			"scale": [0.5, 0.5, 0.5]
+		},
+		"fixed": {
+			"scale": [0.5, 0.5, 0.5]
+		},
+		"thirdperson_righthand": {
+			"translation": [0, 2.5, 0],
+			"scale": [0.85, 0.85, 0.85]
+		},
+		"thirdperson_lefthand": {
+			"translation": [0, 2.5, 0],
+			"scale": [0.85, 0.85, 0.85]
+		}
+	}
 }

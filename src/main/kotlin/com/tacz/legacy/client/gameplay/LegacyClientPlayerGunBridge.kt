@@ -338,11 +338,14 @@ internal object LegacyClientPlayerGunBridge {
 
         if (shootDown) {
             player.isSprinting = false
-            cancelReloadIfNeeded(stack, operator)
             val shouldAttempt = fireMode == FireMode.AUTO || isBurstAuto || !lastShootSuccess
             if (shouldAttempt) {
                 val result = attemptShoot(player, operator)
                 lastShootSuccess = result == ShootResult.SUCCESS
+                if (result == ShootResult.SUCCESS) {
+                    // 只有真正开了一枪才打断装填；按住左键但不射击（冷却/空枪）时不再反复取消，换弹可正常响应
+                    cancelReloadIfNeeded(stack, operator)
+                }
                 if (result == ShootResult.NEED_BOLT && !operator.getSynIsBolting()) {
                     val before = operator.getSynIsBolting()
                     operator.bolt()

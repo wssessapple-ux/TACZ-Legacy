@@ -2,8 +2,12 @@ package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.DefaultAssets
 import com.tacz.legacy.api.event.GunFireEvent
+import com.tacz.legacy.api.item.IAmmo
+import com.tacz.legacy.api.item.IAmmoBox
 import com.tacz.legacy.api.item.IGun
+import com.tacz.legacy.api.item.attachment.AttachmentType
 import com.tacz.legacy.api.item.gun.FireMode
+import com.tacz.legacy.common.application.refit.LegacyGunRefitRuntime
 import com.tacz.legacy.common.entity.EntityKineticBullet
 import com.tacz.legacy.common.item.ModernKineticGunItem
 import com.tacz.legacy.common.network.TACZNetworkHandler
@@ -86,11 +90,11 @@ internal class TACZGunScriptAPI {
         val data = gunData ?: return false
 
         val logicalSide = if (shooter.world.isRemote) Side.CLIENT else Side.SERVER
-        val fireEvent = GunFireEvent(shooter, itemStack, logicalSide)
+        val fireEvent = GunFireEvent(shooter, gun.getGunId(itemStack), logicalSide)
         if (MinecraftForge.EVENT_BUS.post(fireEvent)) return true
 
         if (!shooter.world.isRemote) {
-            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunFire(shooter.entityId, itemStack), shooter)
+            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunFire(shooter.entityId, gun.getGunId(itemStack)), shooter)
         }
 
         if (consumeAmmo) {
@@ -202,6 +206,8 @@ internal class TACZGunScriptAPI {
 
     fun consumeAmmoFromPlayer(neededAmount: Int): Int {
         val gunItem = itemStack.item as? ModernKineticGunItem ?: return 0
+        // 客户端预测：弹药消耗由服务端主导，客户端不真实扣背包，直接返回需要量
+        if (shooter.world.isRemote) return neededAmount
         if (gunItem.useInventoryAmmo(itemStack) && !isReloadingNeedConsumeAmmo()) {
             return neededAmount
         }
@@ -225,28 +231,50 @@ internal class TACZGunScriptAPI {
 
     fun getNeededAmmoAmount(): Int {
         val gun = iGun ?: return 0
-        val data = gunData ?: return 0
-        return data.ammoAmount - gun.getCurrentAmmoCount(itemStack)
+        return getMaxAmmoCount() - gun.getCurrentAmmoCount(itemStack)
     }
 
     fun getAmmoAmount(): Int = iGun?.getCurrentAmmoCount(itemStack) ?: 0
 
-    fun getMaxAmmoCount(): Int = gunData?.ammoAmount ?: 0
+    fun getMaxAmmoCount(): Int = LegacyGunRefitRuntime.computeAmmoCapacity(itemStack).coerceAtLeast(0)
 
-    fun getMagExtentLevel(): Int = 0
+    fun getMagExtentLevel(): Int {
+        val gun = iGun ?: return 0
+        val magId = gun.getAttachmentId(itemStack, AttachmentType.EXTENDED_MAG)
+        return GunDataAccessor.getAttachmentExtendedMagLevel(magId)
+    }
 
     fun hasAmmoToConsume(): Boolean {
         if (!isReloadingNeedConsumeAmmo()) return true
         val gun = iGun ?: return false
         if (gun.useDummyAmmo(itemStack)) return gun.getDummyAmmoAmount(itemStack) > 0
-        return gun.hasInventoryAmmo(shooter, itemStack, true)
+        return if (gun.useInventoryAmmo(itemStack)) {
+            gun.hasInventoryAmmo(shooter, itemStack, true)
+        } else {
+            // magazine 逐发装填（如霰弹枪）：脚本从背包扣弹壳，必须搜背包
+            inventoryHasAmmoForGun()
+        }
+    }
+
+    private fun inventoryHasAmmoForGun(): Boolean {
+        // 客户端预测：装填推进由服务端主导，客户端默认有弹
+        if (shooter.world.isRemote) return true
+        val handler = shooter.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null) ?: return false
+        for (i in 0 until handler.slots) {
+            val s = handler.getStackInSlot(i)
+            if (s.isEmpty) continue
+            val ia = s.item as? IAmmo
+            if (ia != null && ia.isAmmoOfGun(itemStack, s)) return true
+            val ib = s.item as? IAmmoBox
+            if (ib != null && ib.isAmmoBoxOfGun(itemStack, s)) return true
+        }
+        return false
     }
 
     fun putAmmoInMagazine(amount: Int): Int {
         if (amount < 0) return 0
         val gun = iGun ?: return amount
-        val data = gunData ?: return amount
-        val maxAmmo = data.ammoAmount
+        val maxAmmo = getMaxAmmoCount()
         val currentAmmo = gun.getCurrentAmmoCount(itemStack)
         val newAmmo = currentAmmo + amount
         if (maxAmmo < newAmmo) {

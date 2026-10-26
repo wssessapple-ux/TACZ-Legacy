@@ -9,6 +9,7 @@ import com.tacz.legacy.client.event.LegacyClientInputEventHandler
 import com.tacz.legacy.client.event.LegacyClientOverlayEventHandler
 import com.tacz.legacy.client.event.TACZCameraRecoilHandler
 import com.tacz.legacy.client.foundation.FocusedSmokeClientHooks
+import com.tacz.legacy.client.gui.AmmoBoxScreen
 import com.tacz.legacy.client.gui.GunSmithTableScreen
 import com.tacz.legacy.client.input.LegacyKeyBindings
 import com.tacz.legacy.client.renderer.block.GunSmithTableTileEntityRenderer
@@ -24,6 +25,7 @@ import com.tacz.legacy.common.block.entity.GunSmithTableTileEntity
 import com.tacz.legacy.common.foundation.BootstrapDiagnostics
 import com.tacz.legacy.common.foundation.BootstrapStep
 import com.tacz.legacy.common.gui.LegacyGuiIds
+import com.tacz.legacy.common.inventory.AmmoBoxContainer
 import com.tacz.legacy.common.inventory.GunSmithTableContainer
 import com.tacz.legacy.common.entity.EntityKineticBullet
 import com.tacz.legacy.common.item.LegacyItems
@@ -71,6 +73,7 @@ internal class ClientProxy : CommonProxy() {
         // Wire TEISR for gun items (requires "parent": "builtin/entity" in item model JSON)
         LegacyItems.MODERN_KINETIC_GUN.setTileEntityItemStackRenderer(TACZGunItemRenderer)
         LegacyItems.AMMO.setTileEntityItemStackRenderer(TACZAmmoItemRenderer)
+        LegacyItems.AMMO_BOX.setTileEntityItemStackRenderer(TACZAmmoItemRenderer)
         LegacyItems.ATTACHMENT.setTileEntityItemStackRenderer(TACZAttachmentItemRenderer)
         LegacyItems.GUN_SMITH_TABLE.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
         LegacyItems.WORKBENCH_A.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
@@ -92,6 +95,7 @@ internal class ClientProxy : CommonProxy() {
     override fun createClientGuiElement(id: Int, player: EntityPlayer, world: World, pos: BlockPos): Any? {
         return when (id) {
             LegacyGuiIds.GUN_SMITH_TABLE -> GunSmithTableScreen(GunSmithTableContainer(player.inventory, world, pos), player.inventory)
+            LegacyGuiIds.AMMO_BOX -> AmmoBoxScreen(AmmoBoxContainer(player.inventory, player), player.inventory)
             else -> null
         }
     }

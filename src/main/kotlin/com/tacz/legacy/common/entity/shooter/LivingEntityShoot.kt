@@ -112,11 +112,11 @@ public class LivingEntityShoot(
         }
 
         val logicalSide = if (shooter.world.isRemote) Side.CLIENT else Side.SERVER
-        val shootEvent = GunShootEvent(shooter, currentGunItem, logicalSide)
+        val shootEvent = GunShootEvent(shooter, iGun.getGunId(currentGunItem), logicalSide)
         if (MinecraftForge.EVENT_BUS.post(shootEvent)) return ShootResult.FORGE_EVENT_CANCEL
 
         if (!shooter.world.isRemote) {
-            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunShoot(shooter.entityId, currentGunItem), shooter)
+            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunShoot(shooter.entityId, iGun.getGunId(currentGunItem)), shooter)
         }
 
         data.lastShootTimestamp = data.shootTimestamp
@@ -184,13 +184,13 @@ public class LivingEntityShoot(
         }
 
         val logicalSide = if (shooter.world.isRemote) Side.CLIENT else Side.SERVER
-        val fireEvent = GunFireEvent(shooter, gunItem, logicalSide)
+        val fireEvent = GunFireEvent(shooter, iGun.getGunId(gunItem), logicalSide)
         if (MinecraftForge.EVENT_BUS.post(fireEvent)) {
             return true
         }
 
         if (!shooter.world.isRemote) {
-            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunFire(shooter.entityId, gunItem), shooter)
+            TACZNetworkHandler.sendToTrackingEntity(ServerMessageGunFire(shooter.entityId, iGun.getGunId(gunItem)), shooter)
         }
 
         // 弹药消耗（bolt-type-aware）

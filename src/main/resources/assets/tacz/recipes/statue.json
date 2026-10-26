@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " _ ",
+    "QCQ",
+    " C "
+  ],
+  "key": {
+    "_": {
+      "item": "minecraft:stone_slab",
+      "data": 7
+    },
+    "Q": {
+      "item": "minecraft:quartz_stairs"
+    },
+    "C": {
+      "item": "minecraft:chiseled_quartz_block"
+    }
+  },
+  "result": {
+    "item": "tacz:statue"
+  }
+}

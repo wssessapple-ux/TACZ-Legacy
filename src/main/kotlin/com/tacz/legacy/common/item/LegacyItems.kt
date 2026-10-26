@@ -17,6 +17,7 @@ import com.tacz.legacy.common.resource.GunDataAccessor
 import com.tacz.legacy.common.resource.TACZGunPackPresentation
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
 import com.tacz.legacy.common.registry.LegacyCreativeTabs
+import com.tacz.legacy.common.gui.LegacyGuiIds
 import net.minecraft.block.state.IBlockState
 import net.minecraft.client.util.ITooltipFlag
 import net.minecraft.creativetab.CreativeTabs
@@ -26,7 +27,10 @@ import net.minecraft.item.Item
 import net.minecraft.item.ItemBlock
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.util.ActionResult
+import net.minecraft.util.EnumActionResult
 import net.minecraft.util.EnumFacing
+import net.minecraft.util.EnumHand
 import net.minecraft.util.NonNullList
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.BlockPos
@@ -287,7 +291,36 @@ internal class AmmoBoxItem : Item(), IAmmoBox {
         maxStackSize = 1
     }
 
-    override fun getCreativeTabs(): Array<CreativeTabs> = arrayOf(LegacyCreativeTabs.OTHER)
+    override fun getCreativeTabs(): Array<CreativeTabs> = arrayOf(LegacyCreativeTabs.OTHER, LegacyCreativeTabs.AMMO)
+
+    override fun onItemRightClick(worldIn: World, playerIn: EntityPlayer, handIn: EnumHand): ActionResult<ItemStack> {
+        val stack = playerIn.getHeldItem(handIn)
+        // 创意/全口径创意弹箱不开放 GUI，避免无限刷取
+        if (isCreative(stack) || isAllTypeCreative(stack)) {
+            return ActionResult.newResult(EnumActionResult.PASS, stack)
+        }
+        if (!worldIn.isRemote) {
+            playerIn.openGui(TACZLegacy, LegacyGuiIds.AMMO_BOX, worldIn, 0, 0, 0)
+        }
+        return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+    }
+
+    override fun getSubItems(tab: CreativeTabs, items: NonNullList<ItemStack>) {
+        if (!isInCreativeTab(tab)) return
+        val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
+        val ammos = TACZGunPackPresentation.sortedAmmos(snapshot)
+        if (ammos.isEmpty()) {
+            items += ItemStack(this)
+            return
+        }
+        ammos.forEach { (ammoId, _) ->
+            val stack = ItemStack(this)
+            setAmmoId(stack, ammoId)
+            val capacity = snapshot.ammos[ammoId]?.stackSize ?: 64
+            setAmmoCount(stack, capacity)
+            items += stack
+        }
+    }
 
     override fun getItemStackDisplayName(stack: ItemStack): String {
         return LegacyRuntimeTooltipSupport.resolveDisplayName(stack, super.getItemStackDisplayName(stack))

@@ -1,6 +1,7 @@
 package com.tacz.legacy.client.renderer.item
 
 import com.tacz.legacy.api.item.IAmmo
+import com.tacz.legacy.api.item.IAmmoBox
 import com.tacz.legacy.client.model.SlotModel
 import com.tacz.legacy.client.model.TACZPerspectiveAwareBakedModel
 import com.tacz.legacy.client.model.bedrock.BedrockModel
@@ -37,9 +38,13 @@ internal object TACZAmmoItemRenderer : TileEntityItemStackRenderer() {
 
     override fun renderByItem(stack: ItemStack, partialTicks: Float) {
         val item = stack.item
-        if (item !is IAmmo) return
+        if (item !is IAmmo && item !is IAmmoBox) return
 
-        val ammoId = item.getAmmoId(stack)
+        val ammoId: ResourceLocation = when (item) {
+            is IAmmo -> item.getAmmoId(stack)
+            is IAmmoBox -> item.getAmmoId(stack)
+            else -> return
+        }
         val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
 
         val displayId = TACZGunPackPresentation.resolveAmmoDisplayId(snapshot, ammoId) ?: return

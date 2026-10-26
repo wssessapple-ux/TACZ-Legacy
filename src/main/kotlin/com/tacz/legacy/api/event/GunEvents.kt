@@ -15,7 +15,7 @@ import net.minecraftforge.fml.relauncher.Side
 @Cancelable
 public class GunShootEvent(
     public val shooter: EntityLivingBase,
-    public val gunItemStack: ItemStack,
+    public val gunId: ResourceLocation,
     public val logicalSide: Side,
 ) : Event()
 
@@ -26,7 +26,7 @@ public class GunShootEvent(
 @Cancelable
 public class GunFireEvent(
     public val shooter: EntityLivingBase,
-    public val gunItemStack: ItemStack,
+    public val gunId: ResourceLocation,
     public val logicalSide: Side,
 ) : Event()
 

@@ -3,6 +3,7 @@ package com.tacz.legacy.common.entity.shooter
 import com.tacz.legacy.api.entity.ReloadState
 import com.tacz.legacy.api.event.GunReloadEvent
 import com.tacz.legacy.api.item.IGun
+import com.tacz.legacy.common.application.refit.LegacyGunRefitRuntime
 import com.tacz.legacy.common.network.TACZNetworkHandler
 import com.tacz.legacy.common.network.message.event.ServerMessageReload
 import com.tacz.legacy.common.resource.BoltType
@@ -42,8 +43,8 @@ public class LivingEntityReload(
         val currentAmmo = iGun.getCurrentAmmoCount(currentGunItem)
         val hasBulletInBarrel = iGun.hasBulletInBarrel(currentGunItem)
 
-        // 满弹判定
-        val maxAmmo = gunData.ammoAmount
+        // 满弹判定（考虑扩容弹夹容量）
+        val maxAmmo = LegacyGunRefitRuntime.computeAmmoCapacity(currentGunItem).coerceAtLeast(0)
         val isBarrelFull = hasBulletInBarrel || gunData.boltType == BoltType.OPEN_BOLT
         if (currentAmmo >= maxAmmo && isBarrelFull) return
 

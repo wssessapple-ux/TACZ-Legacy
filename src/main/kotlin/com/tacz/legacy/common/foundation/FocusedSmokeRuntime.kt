@@ -781,7 +781,7 @@ internal object FocusedSmokeRuntime {
         if (!enabled || !matchesFocusedPlayer(event.shooter.uniqueID)) {
             return
         }
-        val gunId = IGun.getIGunOrNull(event.gunItemStack)?.getGunId(event.gunItemStack) ?: return
+        val gunId = event.gunId
         logOnce("shoot-${event.logicalSide}-$gunId", "GUN_SHOOT side=${event.logicalSide} gun=$gunId")
     }
 
@@ -790,7 +790,7 @@ internal object FocusedSmokeRuntime {
         if (!enabled || !matchesFocusedPlayer(event.shooter.uniqueID)) {
             return
         }
-        val gunId = IGun.getIGunOrNull(event.gunItemStack)?.getGunId(event.gunItemStack) ?: return
+        val gunId = event.gunId
         logOnce("fire-${event.logicalSide}-$gunId", "GUN_FIRE side=${event.logicalSide} gun=$gunId")
     }
 

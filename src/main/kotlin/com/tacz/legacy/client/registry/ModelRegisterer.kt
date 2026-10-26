@@ -21,6 +21,7 @@ internal object ModelRegisterer {
     private val perspectiveAwareItems: List<Item> = listOf(
         LegacyItems.MODERN_KINETIC_GUN,
         LegacyItems.AMMO,
+        LegacyItems.AMMO_BOX,
         LegacyItems.ATTACHMENT,
         LegacyItems.GUN_SMITH_TABLE,
         LegacyItems.WORKBENCH_A,
