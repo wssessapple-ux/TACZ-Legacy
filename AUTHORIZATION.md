@@ -3,7 +3,8 @@
 本项目（TACZ-Legacy 1.12.2 Forge 移植版）已获得上游原作者 Hikari_Nova 的正式接手授权。
 
 **授权截图：**
-[原作者授权截图]<img width="899" height="346" alt="image" src="https://github.com/user-attachments/assets/6fd6d15b-ef8e-4c08-ab0f-cfef1ead37e9" />   <img width="1045" height="795" alt="image" src="https://github.com/user-attachments/assets/0652d5fe-ca25-4619-97fa-8e2ca7cf1627" />
+[原作者授权截图]  <img width="1055" height="546" alt="image" src="https://github.com/user-attachments/assets/1086cc67-3390-463d-84f7-950bc083d8d1" />
+   <img width="1045" height="795" alt="image" src="https://github.com/user-attachments/assets/0652d5fe-ca25-4619-97fa-8e2ca7cf1627" />
 
 
 
