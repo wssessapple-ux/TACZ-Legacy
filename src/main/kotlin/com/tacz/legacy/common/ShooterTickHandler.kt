@@ -8,6 +8,7 @@ import net.minecraft.item.ItemStack
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayerMP
 import com.tacz.legacy.common.entity.shooter.BurstFireTaskScheduler
+import com.tacz.legacy.common.entity.shooter.LivingEntitySpeedModifier
 import net.minecraftforge.event.entity.EntityJoinWorldEvent
 import net.minecraftforge.event.entity.living.LivingEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
@@ -44,7 +45,11 @@ internal object ShooterTickHandler {
     @SubscribeEvent
     fun onLivingTick(event: LivingEvent.LivingUpdateEvent) {
         val entity: EntityLivingBase = event.entityLiving ?: return
-        // 只在服务端 tick
+        // 兼容层 ③ C6：movement_speed / weight_modifier 两端都更新
+        // （1.12.2 玩家位移由客户端 EntityPlayerSP 预测驱动，服务端 applyModifier 不会自动同步到客户端）
+        LivingEntitySpeedModifier.updateSpeedModifier(entity)
+
+        // 其余子系统只在服务端 tick
         if (entity.world.isRemote) return
 
         val operator = IGunOperator.fromLivingEntity(entity)

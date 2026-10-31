@@ -4,6 +4,8 @@ import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.IGunOperator
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.common.foundation.FocusedSmokeRuntime
+import com.tacz.legacy.common.network.TACZNetworkHandler
+import com.tacz.legacy.common.network.message.event.ServerMessageShootState
 import io.netty.buffer.ByteBuf
 import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage
@@ -58,6 +60,17 @@ public class ClientMessagePlayerShoot() : IMessage, IMessageHandler<ClientMessag
                 // we must force sync the mainhand item to revert the client's local ammo deduction.
                 player.sendAllContents(player.openContainer, player.openContainer.inventory)
             }
+            // 回传服务端权威结果与最新枪械状态（弹药/发热/锁枪），修复高射速空枪：
+            // 客户端据此对齐本地状态、在拒绝时停止连发，避免"开了枪但没子弹实体"。
+            val iGunAfter = player.heldItemMainhand.item as? IGun
+            val ammoAfter = iGunAfter?.getCurrentAmmoCount(player.heldItemMainhand) ?: 0
+            val heatAfter = iGunAfter?.getHeatAmount(player.heldItemMainhand) ?: 0f
+            val lockedAfter = iGunAfter?.isOverheatLocked(player.heldItemMainhand) ?: false
+            val gunIdAfter = iGunAfter?.getGunId(player.heldItemMainhand)?.toString()
+            TACZNetworkHandler.sendToPlayer(
+                ServerMessageShootState(result, gunIdAfter, ammoAfter, heatAfter, lockedAfter),
+                player,
+            )
         }
         return null
     }

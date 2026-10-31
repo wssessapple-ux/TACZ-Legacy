@@ -3,7 +3,9 @@
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.tacz.legacy.api.DefaultAssets
+import com.tacz.legacy.api.modifier.Modifier
 import net.minecraft.util.ResourceLocation
+import net.minecraft.util.math.MathHelper
 
 private fun JsonObject.safeGetObject(key: String): JsonObject? =
     get(key)?.let { if (it.isJsonObject) it.asJsonObject else null }
@@ -92,9 +94,21 @@ public class GunCombatData private constructor(
     /**
      * 获取基于 RPM 的射击间隔（毫秒）。
      */
-    public fun getShootIntervalMs(): Long {
+    /** 无参版本保留（Java 动画状态机等不接 rpm modifier 的路径仍可用）。 */
+    public fun getShootIntervalMs(): Long = getShootIntervalMs(emptyList())
+
+    public fun getShootIntervalMs(rpmModifiers: List<Modifier>): Long {
         if (roundsPerMinute <= 0) return 0L
-        return (60_000L / roundsPerMinute)
+        // 兼容层 ③ C1-3：接入配件 rpm modifier。对齐上游 getRoundsPerMinute ——
+        // 先取基础 rpm，eval 配件 modifier，clamp(1,1200)，再转射速间隔。
+        // heat 倍率在我方是分离的（resolver 计算），不在这里乘，避免改变现网 heat 语义。
+        val evaluated = if (rpmModifiers.isEmpty()) {
+            roundsPerMinute.toDouble()
+        } else {
+            TACZAttachmentModifierRegistry.evalNumeric(rpmModifiers, roundsPerMinute.toDouble())
+        }
+        val clamped = MathHelper.clamp(Math.round(evaluated).toInt(), 1, 1200)
+        return 60_000L / clamped
     }
 
     public fun getBurstMinIntervalMs(): Long {

@@ -69,6 +69,38 @@ internal object LegacyClientShootCoordinator {
     }
 
     /**
+     * 服务端回传射击结果与最新枪械权威状态时调用（主线程）。
+     *
+     * 1. 用服务端权威状态覆盖本地弹药/发热/锁枪，消除客户端显示漂移导致的盲射空枪；
+     * 2. 服务端拒绝（非 SUCCESS）时停止点射调度，并给本次射击套上冷却，阻止继续盲连发。
+     */
+    internal fun applyServerShootState(
+        result: ShootResult,
+        gunId: String?,
+        ammoCount: Int,
+        heatAmount: Float,
+        overheatLocked: Boolean,
+    ) {
+        val player = Minecraft.getMinecraft().player ?: return
+        val stack = player.heldItemMainhand
+        val iGun = stack.item as? IGun
+        if (iGun != null && (gunId == null || iGun.getGunId(stack).toString() == gunId)) {
+            // NETWORK_FAIL（时间戳抖动/卡顿）时保留客户端预测扣弹，不回滚弹药，
+            // 避免重型整合包低 TPS 下"扣了又回"的观感抖动；其余拒绝仍以服务端权威回滚。
+            if (result != ShootResult.NETWORK_FAIL) {
+                iGun.setCurrentAmmoCount(stack, ammoCount)
+            }
+            iGun.setHeatAmount(stack, heatAmount)
+            iGun.setOverheatLocked(stack, overheatLocked)
+        }
+        if (result != ShootResult.SUCCESS) {
+            cancelActiveBurst()
+            // 拒绝后把本次射击时间戳置为当前，使下一次 attemptShoot 的冷却检查拦住本次拒绝
+            clientShootTimestampMs = System.currentTimeMillis()
+        }
+    }
+
+    /**
      * 脚本通过 adjustClientShootInterval 调整射击冷却时间戳。
      * 正值表示推迟下次射击 (增加冷却)，负值表示提前 (减少冷却)。
      */
@@ -135,6 +167,11 @@ internal object LegacyClientShootCoordinator {
         clientShootTimestampMs = now
 
         TACZNetworkHandler.sendToServer(ClientMessagePlayerShoot(pitch, yaw, relativeTimestamp))
+        // 客户端预测扣弹（仅弹匣内弹，背包供弹不做本地预测）：
+        // 本地先扣一发让弹药显示即时递减，服务端随后回传权威状态对齐/回滚。
+        if (!useInventoryAmmo) {
+            iGun.reduceCurrentAmmoCount(stack)
+        }
         val fireEvent = GunFireEvent(player, iGun.getGunId(stack), Side.CLIENT)
         val fireAccepted = !MinecraftForge.EVENT_BUS.post(fireEvent)
         if (fireAccepted) {
@@ -226,7 +263,10 @@ internal object LegacyClientShootCoordinator {
         val interval = if (fireMode == FireMode.BURST) {
             (gunData.burstMinInterval * 1000f).toLong()
         } else {
-            gunData.getShootIntervalMs()
+            // C1-3：接入配件 rpm modifier
+            gunData.getShootIntervalMs(
+                com.tacz.legacy.common.resource.TACZGunPropertyResolver.collectGunNumericModifiers(stack, iGun, "rpm"),
+            )
         }
         var coolDown = interval - (System.currentTimeMillis() - clientShootTimestampMs)
         coolDown -= 5L

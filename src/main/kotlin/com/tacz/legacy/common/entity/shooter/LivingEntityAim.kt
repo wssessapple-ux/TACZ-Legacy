@@ -2,6 +2,8 @@ package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.common.resource.GunDataAccessor
+import com.tacz.legacy.common.resource.TACZAttachmentModifierRegistry
+import com.tacz.legacy.common.resource.TACZGunPropertyResolver
 import net.minecraft.entity.EntityLivingBase
 
 /**
@@ -53,7 +55,13 @@ public class LivingEntityAim(
             return
         }
 
-        val aimTimeMs = (gunData.aimTimeS * 1000).toLong()
+        // 兼容层 ③ C1-4：配件 ads modifier 修正开镜时长（对齐上游 LocalPlayerAim 读缓存后的 aimTime）
+        val adsModifiers = TACZGunPropertyResolver.collectGunNumericModifiers(currentGunItem, iGun, "ads")
+        val aimTimeMs = if (adsModifiers.isEmpty()) {
+            (gunData.aimTimeS * 1000).toLong()
+        } else {
+            (TACZAttachmentModifierRegistry.evalNumeric(adsModifiers, gunData.aimTimeS.toDouble()).toFloat() * 1000).toLong()
+        }
         if (aimTimeMs <= 0) {
             data.aimingProgress = if (data.isAiming) 1f else 0f
             return

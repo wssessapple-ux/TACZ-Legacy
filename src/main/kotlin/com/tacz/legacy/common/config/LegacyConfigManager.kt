@@ -64,6 +64,7 @@ internal data class ServerConfigValues(
     var interactKeyBlacklistEntities: List<String> = emptyList(),
     var enableTableFilter: Boolean = true,
     var serverShootNetworkCheck: Boolean = true,
+    var serverShootNetworkTimeout: Int = 600,
     var serverShootCooldownCheck: Boolean = true,
     var damageBaseMultiplier: Double = 1.0,
     var armorIgnoreBaseMultiplier: Double = 1.0,
@@ -365,6 +366,10 @@ internal object LegacyConfigManager {
             server.serverShootNetworkCheck = cfg.getBoolean(
                 "ServerShootNetworkCheck", "misc", true,
                 "Do server-side network checks while shooting or not."
+            )
+            server.serverShootNetworkTimeout = cfg.getInt(
+                "ServerShootNetworkTimeout", "misc", 600, 100, 5000,
+                "Server-side shoot timestamp tolerance in ms. Singleplayer/LAN auto-widens to >=2000ms; dedicated servers use this value (default 600)."
             )
             server.serverShootCooldownCheck = cfg.getBoolean(
                 "ServerShootCooldownCheck", "misc", true,

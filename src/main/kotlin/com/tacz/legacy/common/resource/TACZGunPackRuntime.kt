@@ -7,6 +7,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.JsonSerializer
+import com.google.gson.JsonSyntaxException
 import com.google.gson.annotations.SerializedName
 import com.google.gson.stream.JsonReader
 import com.tacz.legacy.TACZLegacy
@@ -314,6 +315,8 @@ internal object TACZGunPackRuntimeRegistry {
         if (loaded.issues.isNotEmpty()) {
             loaded.issues.forEach { issue -> TACZLegacy.logger.warn("[GunPackRuntime] {}", issue) }
         }
+        // modifier 接入守门：注册的 modifier 必须有审计条目，未生效项在此如实可见
+        TACZModifierAudit.logAudit()
     }
 
     internal fun getSnapshot(): TACZRuntimeSnapshot = snapshot
@@ -796,7 +799,7 @@ internal object TACZAttachmentModifierRegistry {
         "armor_ignore" to TACZNumericModifierReader(id = "armor_ignore"),
         "damage" to TACZNumericModifierReader(id = "damage"),
         "effective_range" to TACZNumericModifierReader(id = "effective_range"),
-        "explosion" to TACZRawJsonModifierReader(id = "explosion"),
+        "explosion" to TACZExplosionModifierReader,
         "head_shot" to TACZNumericModifierReader(id = "head_shot"),
         "ignite" to TACZIgniteModifierReader,
         "inaccuracy" to TACZInaccuracyModifierReader,
@@ -847,6 +850,77 @@ internal object TACZAttachmentModifierRegistry {
             result[key] = ModifierEvaluator.eval(values, defaultValue.toDouble()).toFloat()
         }
         return result
+    }
+
+    internal fun registeredModifierIds(): Set<String> = readers.keys.toSet()
+}
+
+/**
+ * 配件 modifier 接入守门审计。
+ *
+ * 仿 Next 分支"注册了就一定有人消费"的守门思路：
+ * - 每个注册的 modifier key 必须在 [audit] 表中登记其消费状态，否则视为可能空转；
+ * - 启动/重载时把 APPLIED / GUI_ONLY / UNCONSUMED 三档如实打到日志，
+ *   让"注册了没人读"从人肉 grep 变成启动可见的告警，杜绝空转层悄悄蔓延。
+ */
+internal object TACZModifierAudit {
+    internal enum class ConsumerStatus { APPLIED, GUI_ONLY, UNCONSUMED }
+
+    internal data class AuditEntry(
+        val status: ConsumerStatus,
+        val consumer: String,
+        val note: String,
+    )
+
+    private val audit: Map<String, AuditEntry> = linkedMapOf(
+        "ads" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "改装台预览瞄准时间；战斗 aimTime 未应用配件值"),
+        "ammo_speed" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览弹速；子弹 speed 用枪械基础值"),
+        "armor_ignore" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览穿甲；子弹 armorIgnore 用基础 extraDamage"),
+        "damage" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览伤害；子弹 damage 用基础值"),
+        "effective_range" to AuditEntry(ConsumerStatus.UNCONSUMED, "-", "注册读取但无人消费"),
+        "explosion" to AuditEntry(ConsumerStatus.UNCONSUMED, "-", "注册读取但无人消费"),
+        "head_shot" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览爆头倍率；子弹 headShotMultiplier 用基础 extraDamage"),
+        "ignite" to AuditEntry(ConsumerStatus.APPLIED, "LivingEntityShoot.performSingleFire", "配件点燃覆盖子弹 igniteEntity/igniteBlock"),
+        "inaccuracy" to AuditEntry(ConsumerStatus.APPLIED, "TACZGunPropertyResolver.resolveInaccuracyProfile", "战斗精度"),
+        "knockback" to AuditEntry(ConsumerStatus.UNCONSUMED, "-", "注册读取但无人消费"),
+        "pierce" to AuditEntry(ConsumerStatus.UNCONSUMED, "-", "注册读取但无人消费"),
+        "movement_speed" to AuditEntry(ConsumerStatus.UNCONSUMED, "-", "注册读取但无人消费"),
+        "recoil" to AuditEntry(ConsumerStatus.APPLIED, "TACZGunPropertyResolver.resolveCameraRecoil", "后坐力"),
+        "rpm" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览射速；射速用基础 rpm"),
+        "silence" to AuditEntry(ConsumerStatus.APPLIED, "TACZGunSoundRouting.resolveNearbyFireSoundProfile", "开火声音距离/消音"),
+        "weight_modifier" to AuditEntry(ConsumerStatus.GUI_ONLY, "GunRefitScreen", "预览重量；移动速度用基础值"),
+    )
+
+    internal fun logAudit() {
+        val issues = mutableListOf<String>()
+        val unconsumed = mutableListOf<String>()
+        val guiOnly = mutableListOf<String>()
+        TACZAttachmentModifierRegistry.registeredModifierIds().forEach { key ->
+            val entry = audit[key]
+            if (entry == null) {
+                issues += "Modifier '$key' is registered but has NO audit entry (possibly unconsumed)."
+            } else {
+                when (entry.status) {
+                    ConsumerStatus.UNCONSUMED -> unconsumed += key
+                    ConsumerStatus.GUI_ONLY -> guiOnly += key
+                    ConsumerStatus.APPLIED -> Unit
+                }
+            }
+        }
+        if (issues.isNotEmpty()) {
+            TACZLegacy.logger.error("[ModifierAudit] Registered modifiers without audit entries: {}", issues)
+        }
+        if (unconsumed.isNotEmpty()) {
+            TACZLegacy.logger.warn("[ModifierAudit] UNCONSUMED (registered but no consumer): {}", unconsumed)
+        }
+        if (guiOnly.isNotEmpty()) {
+            TACZLegacy.logger.warn("[ModifierAudit] GUI_ONLY (preview only, not in combat): {}", guiOnly)
+        }
+        val applied = audit.values.count { it.status == ConsumerStatus.APPLIED }
+        TACZLegacy.logger.info(
+            "[ModifierAudit] {} modifier(s) APPLIED, {} GUI_ONLY, {} UNCONSUMED",
+            applied, guiOnly.size, unconsumed.size,
+        )
     }
 }
 
@@ -905,6 +979,60 @@ private object TACZIgniteModifierReader : TACZModifierReader<TACZIgniteValue> {
             else -> TACZJson.GSON.fromJson(element, TACZIgniteValue::class.java)
         }
         return TACZSimpleJsonProperty(value)
+    }
+}
+
+/**
+ * 兼容层 ③ C2-exp：配件 explosion 的 typed 值。
+ *
+ * radius / damage / delay 是 Modifier 四元组，缺省即中性值（等价上游的 `new Modifier()`）；
+ * explode / knockback / destroy_block 是布尔，上游语义里它们**不以 explode 为条件**参与聚合。
+ */
+internal data class TACZExplosionModifierValue(
+    val explode: Boolean = false,
+    val radius: Modifier = Modifier(),
+    val damage: Modifier = Modifier(),
+    val knockback: Boolean = false,
+    val destroyBlock: Boolean = false,
+    val delay: Modifier = Modifier(),
+)
+
+private object TACZExplosionModifierReader : TACZModifierReader<TACZExplosionModifierValue> {
+    override val id: String = "explosion"
+
+    /**
+     * 审计全局-1：explosion 过去用 [TACZRawJsonModifierReader] 把 JsonObject 原样带到结算侧，
+     * 每发子弹对每个配件、每个 key 重新 `GSON.fromJson`（TypeAdapter 查找 + 反射 + 装箱），
+     * 是射击热路径上唯一的反射点。这里与 recoil / ignite 同构，改成解析期一次成型。
+     *
+     * 审计 B1-8：格式错误（`radius` 写成裸数字、整个 `explosion` 写成数组）过去被结算侧的
+     * `takeIf { isJsonObject }` 静默吞掉，不记 issue。上游靠反射适配器抛 JsonSyntaxException
+     * 让该 modifier 可见地失败，所以这里也**直接抛出**，由 readModifiers 的 reader 级隔离记 issue。
+     */
+    override fun read(rawJson: String, jsonObject: JsonObject): JsonProperty<TACZExplosionModifierValue>? {
+        val element = jsonObject.get(id) ?: return null
+        val explosionObject = element.takeIf(JsonElement::isJsonObject)?.asJsonObject
+            ?: throw JsonSyntaxException("'explosion' must be a JSON object, but is $element")
+
+        fun modifier(key: String): Modifier {
+            val value = explosionObject.get(key) ?: return Modifier()
+            if (value.isJsonNull) return Modifier()
+            return TACZJson.GSON.fromJson(value, Modifier::class.java) ?: Modifier()
+        }
+
+        fun boolean(key: String): Boolean =
+            explosionObject.get(key)?.takeIf { !it.isJsonNull }?.asBoolean ?: false
+
+        return TACZSimpleJsonProperty(
+            TACZExplosionModifierValue(
+                explode = boolean("explode"),
+                radius = modifier("radius"),
+                damage = modifier("damage"),
+                knockback = boolean("knockback"),
+                destroyBlock = boolean("destroy_block"),
+                delay = modifier("delay"),
+            ),
+        )
     }
 }
 

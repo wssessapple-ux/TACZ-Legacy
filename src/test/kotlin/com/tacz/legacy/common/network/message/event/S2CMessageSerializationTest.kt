@@ -26,7 +26,7 @@ class S2CMessageSerializationTest {
 
     @Test
     fun `ServerMessageGunShoot round-trips entityId and stack`() {
-        val msg = ServerMessageGunShoot(42, ItemStack.EMPTY)
+        val msg = ServerMessageGunShoot(42, ResourceLocation("tacz", "ak47"))
         val buf = Unpooled.buffer()
         msg.toBytes(buf)
 
@@ -40,7 +40,7 @@ class S2CMessageSerializationTest {
 
     @Test
     fun `ServerMessageGunFire round-trips entityId and stack`() {
-        val msg = ServerMessageGunFire(99, ItemStack.EMPTY)
+        val msg = ServerMessageGunFire(99, ResourceLocation("tacz", "ak47"))
         val buf = Unpooled.buffer()
         msg.toBytes(buf)
 

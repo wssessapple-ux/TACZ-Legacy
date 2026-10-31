@@ -255,11 +255,19 @@ internal object TACZClientAssetManager {
             blockDisplays = blockDisplays.values,
         )
 
+        // 全量加载：除 display 引用的脚本外，把每个 gun_pack 的 assets/<ns>/scripts/ 下
+        // 所有 .lua 都纳入加载池——display 未引用但被 require() 的辅助脚本也能进池，
+        // 从而让依赖 require() 的 1.20.1 枪包状态机跑起来。
+        val allScripts = LinkedHashSet(loadPlan.scripts)
+        for (pack in snapshot.packs.values) {
+            allScripts.addAll(enumeratePackScriptIds(pack.sourceFile))
+        }
+
         // Load assets from each pack
         for (pack in snapshot.packs.values) {
-            loadAssetsFromPack(pack.sourceFile, loadPlan.models, loadPlan.textures, loadPlan.animations, loadPlan.scripts)
+            loadAssetsFromPack(pack.sourceFile, loadPlan.models, loadPlan.textures, loadPlan.animations, allScripts)
         }
-        loadAssetsFromClasspath(loadPlan.models, loadPlan.textures, loadPlan.animations, loadPlan.scripts)
+        loadAssetsFromClasspath(loadPlan.models, loadPlan.textures, loadPlan.animations, allScripts)
 
         // Resolve scripts with dependency-aware retry (scripts use require() to reference each other)
         resolveAllScripts()
@@ -441,6 +449,63 @@ internal object TACZClientAssetManager {
         } else if (packFile.name.endsWith(".zip", ignoreCase = true)) {
             loadFromZip(packFile, neededModels, neededTextures, neededAnimations, neededScripts)
         }
+    }
+
+    /**
+     * 全量枚举一个 gun_pack 的 assets/<ns>/scripts/ 下所有 .lua 脚本 id。
+     * 支持目录与 zip 直读；配合全量加载，让 display 未引用但被 require() 的脚本也能进池。
+     */
+    private fun enumeratePackScriptIds(packFile: File): Set<ResourceLocation> {
+        if (!packFile.exists()) return emptySet()
+        val ids = LinkedHashSet<ResourceLocation>()
+        if (packFile.isDirectory) {
+            val root = packFile.toPath()
+            val assetsDir = root.resolve("assets")
+            if (Files.isDirectory(assetsDir)) {
+                Files.list(assetsDir).use { nsDirs ->
+                    for (nsDir in nsDirs) {
+                        if (!Files.isDirectory(nsDir)) continue
+                        val scriptsDir = nsDir.resolve("scripts")
+                        if (!Files.isDirectory(scriptsDir)) continue
+                        val ns = nsDir.fileName.toString()
+                        Files.walk(scriptsDir).use { stream ->
+                            stream.filter { file -> Files.isRegularFile(file) && file.toString().endsWith(".lua", ignoreCase = true) }
+                                .forEach { file ->
+                                    val rel = scriptsDir.relativize(file).toString().replace('\\', '/').removeSuffix(".lua")
+                                    if (rel.isNotBlank()) {
+                                        ids.add(ResourceLocation(ns, rel))
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+        } else if (packFile.name.endsWith(".zip", ignoreCase = true)) {
+            try {
+                ZipFile(packFile).use { zip ->
+                    val entries = zip.entries()
+                    while (entries.hasMoreElements()) {
+                        val entry = entries.nextElement()
+                        if (entry.isDirectory) continue
+                        val name = entry.name
+                        if (!name.startsWith("assets/") || !name.endsWith(".lua", ignoreCase = true)) continue
+                        val rel = name.removePrefix("assets/")
+                        val slash = rel.indexOf('/')
+                        if (slash <= 0) continue
+                        val ns = rel.substring(0, slash)
+                        val rest = rel.substring(slash + 1)
+                        if (!rest.startsWith("scripts/")) continue
+                        val scriptPath = rest.removePrefix("scripts/").removeSuffix(".lua")
+                        if (scriptPath.isNotBlank()) {
+                            ids.add(ResourceLocation(ns, scriptPath))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                TACZLegacy.logger.warn(MARKER, "Failed to enumerate scripts from zip: {}", packFile.name, e)
+            }
+        }
+        return ids
     }
 
     private fun loadAssetsFromClasspath(

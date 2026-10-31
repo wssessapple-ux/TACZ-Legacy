@@ -20,6 +20,10 @@ import com.tacz.legacy.common.resource.GunDataAccessor
 import com.tacz.legacy.common.resource.TACZGunSoundRouting
 import com.tacz.legacy.common.resource.TACZGunPackPresentation
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
+import com.tacz.legacy.common.resource.TACZGunPropertyResolver
+import com.tacz.legacy.common.resource.TACZGunPropertyResolver.collectAttachmentIds
+import com.tacz.legacy.common.resource.TACZIgniteValue
+import com.tacz.legacy.common.resource.TACZAttachmentModifierRegistry
 import com.tacz.legacy.sound.SoundManager
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayerMP
@@ -55,14 +59,22 @@ public class LivingEntityShoot(
 
         // 网络时间戳校验
         if (LegacyConfigManager.server.serverShootNetworkCheck && shooter is EntityPlayerMP) {
+            // 容忍窗口：单机/局域网（IntegratedServer，含开服主机）放宽到至少 2000ms，
+            // 避免重型整合包 TPS 低/卡顿/暂停时把正常玩家误判为时间戳异常（导致弹药"扣了又回"）。
+            val isLocalServer = shooter.server is net.minecraft.server.integrated.IntegratedServer
+            val timeout = if (isLocalServer) {
+                LegacyConfigManager.server.serverShootNetworkTimeout.coerceAtLeast(2000).toLong()
+            } else {
+                LegacyConfigManager.server.serverShootNetworkTimeout.toLong()
+            }
             val now = System.currentTimeMillis()
             var alpha = now - data.baseTimestamp - timestamp
             val isFirstTimedShoot = data.shootTimestamp < 0L && data.lastShootTimestamp < 0L
-            if (isFirstTimedShoot && (alpha < -300 || alpha > 600)) {
+            if (isFirstTimedShoot && (alpha < -timeout || alpha > timeout)) {
                 data.baseTimestamp = now - timestamp
                 alpha = now - data.baseTimestamp - timestamp
             }
-            if (alpha < -300 || alpha > 600) {
+            if (alpha < -timeout || alpha > timeout) {
                 val nowMs = System.currentTimeMillis()
                 // 抑制窗口：1.5 秒内最多发一次同步握手，防时间戳抖动期疯狂发包
                 if (nowMs - data.lastSyncTimestamp >= 1500L) {
@@ -203,6 +215,7 @@ public class LivingEntityShoot(
             val bulletData = gunData.bulletData
             val gunId = iGun.getGunId(gunItem)
             val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
+            val attachmentModifiers = TACZGunPropertyResolver.collectAttachmentModifiers(gunItem, iGun)
             val gunDisplayId = TACZGunPackPresentation.resolveGunDisplayId(snapshot, gunId) ?: DefaultAssets.DEFAULT_GUN_DISPLAY_ID
             val nearbySoundProfile = TACZGunSoundRouting.resolveNearbyFireSoundProfile(gunItem)
             val ammoId = gunData.ammoId ?: DefaultAssets.EMPTY_AMMO_ID
@@ -224,7 +237,23 @@ public class LivingEntityShoot(
                 )
             }
 
-            val processedSpeed = bulletData.getProcessedSpeed()
+            // 配件 ammo_speed：用装配的弹速 modifier 覆盖基础弹速（含最小值下限）。
+            // 注：未含 fireModeAdjust 的发射模式微调（我方 GunCombatData 无 fireModeAdjusts 字段，独立治理项）。
+            val processedSpeed = if (attachmentModifiers.ammoSpeed.isNotEmpty()) {
+                TACZAttachmentModifierRegistry.evalNumeric(
+                    attachmentModifiers.ammoSpeed,
+                    bulletData.getProcessedSpeed().toDouble(),
+                ).toFloat().coerceAtLeast(0.1f)
+            } else {
+                bulletData.getProcessedSpeed()
+            }
+            // 配件 ignite：用装配的点燃配件 modifier 覆盖枪械基础点燃属性
+            val ignition = TACZAttachmentModifierRegistry.evalIgnite(
+                collectAttachmentIds(gunItem, iGun).mapNotNull { attachmentId ->
+                    snapshot.attachments[attachmentId]?.data?.modifiers?.get("ignite")?.getValue() as? TACZIgniteValue
+                },
+                TACZIgniteValue(igniteEntity = bulletData.igniteEntity, igniteBlock = bulletData.igniteBlock),
+            )
             val bulletAmount = TACZBulletSpreadResolver.resolveBulletAmount(gunItem, iGun, gunData)
             val pitchVal = pitch.get()
             val yawVal = yaw.get()
@@ -236,6 +265,13 @@ public class LivingEntityShoot(
                     gunId, gunDisplayId, ammoId, isTracer,
                 )
                 bullet.applyShotgunDamageSpread(bulletAmount)
+                bullet.applyAttachmentIgnite(ignition)
+                // 配件子弹属性：armor_ignore/head_shot/pierce + damage + effective_range
+                bullet.applyAttachmentModifiers(attachmentModifiers)
+                bullet.applyAttachmentDamageModifier(attachmentModifiers.damage)
+                bullet.applyAttachmentEffectiveRange(attachmentModifiers.effectiveRange)
+                // C2-exp：配件 explosion 聚合（typed，热路径不碰 Gson）
+                bullet.applyAttachmentExplosion(attachmentModifiers.explosion)
                 TACZBulletSpreadResolver.applySpread(
                     shooter = shooter,
                     dataHolder = data,
@@ -347,7 +383,8 @@ public class LivingEntityShoot(
         val shootInterval = if (fireMode == FireMode.BURST) {
             gunData.getBurstMinIntervalMs()
         } else {
-            gunData.getShootIntervalMs()
+            // C1-3：接入配件 rpm modifier
+            gunData.getShootIntervalMs(TACZGunPropertyResolver.collectGunNumericModifiers(currentGunItem, iGun, "rpm"))
         }
 
         var coolDown = shootInterval - interval

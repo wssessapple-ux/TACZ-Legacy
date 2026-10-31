@@ -38,12 +38,12 @@ import net.minecraftforge.oredict.OreDictionary
 import net.minecraftforge.fml.common.registry.ForgeRegistries
 import java.util.Locale
 
-internal data class LegacyGunSmithIngredient(
+public data class LegacyGunSmithIngredient(
     val ingredient: Ingredient,
     val count: Int,
 )
 
-internal data class LegacyGunSmithRecipe(
+public data class LegacyGunSmithRecipe(
     val id: ResourceLocation,
     val group: ResourceLocation,
     val result: ItemStack,
@@ -51,13 +51,23 @@ internal data class LegacyGunSmithRecipe(
     val sourceNamespace: String,
 )
 
-internal data class LegacyGunSmithTab(
+public data class LegacyGunSmithTab(
     val id: ResourceLocation,
     val displayName: String,
     val icon: ItemStack,
 )
 
 internal object LegacyGunSmithingRuntime {
+    /**
+     * 构造带 BlockId 的工作台物品，供 JEI catalyst / 分类图标使用。
+     * 桥接方法：签名只暴露 ResourceLocation / ItemStack，不泄漏内部 item 类型。
+     */
+    fun workbenchIcon(blockId: ResourceLocation): ItemStack {
+        val stack = ItemStack(LegacyItems.GUN_SMITH_TABLE, 1)
+        LegacyItems.GUN_SMITH_TABLE.setBlockId(stack, blockId)
+        return stack
+    }
+
     private var cachedSnapshot: TACZRuntimeSnapshot? = null
     private var cachedRecipes: Map<ResourceLocation, LegacyGunSmithRecipe> = emptyMap()
 

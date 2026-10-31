@@ -3,6 +3,7 @@ package com.tacz.legacy.common.inventory
 import com.tacz.legacy.api.DefaultAssets
 import com.tacz.legacy.api.item.IAmmo
 import com.tacz.legacy.api.item.IAmmoBox
+import com.tacz.legacy.common.config.LegacyConfigManager
 import com.tacz.legacy.common.item.LegacyItems
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
 import net.minecraft.entity.player.EntityPlayer
@@ -25,11 +26,16 @@ internal class AmmoBoxInventory(private val box: ItemStack) : IInventory {
     /** 箱内弹药口径；空箱返回 EMPTY_AMMO_ID */
     internal val ammoId: ResourceLocation get() = boxAmmo.getAmmoId(box)
 
-    /** 当前口径弹药的最大堆叠上限（来自枪包数据） */
+    /** 当前口径弹药的最大堆叠上限（来自枪包数据 × ammoBoxStackSize 配置） */
     internal val maxStackLimit: Int
         get() {
             val id = ammoId
-            return if (id == DefaultAssets.EMPTY_AMMO_ID) 1 else TACZGunPackRuntimeRegistry.getSnapshot().ammos[id]?.stackSize?.coerceAtLeast(1) ?: 1
+            if (id == DefaultAssets.EMPTY_AMMO_ID) return 1
+            val stackSize = TACZGunPackRuntimeRegistry.getSnapshot().ammos[id]?.stackSize?.coerceAtLeast(1) ?: 1
+            // 兼容层 ③ C7：弹箱容量 = 弹药 stackSize × ammoBoxStackSize 配置（对齐 Next/上游，
+            // 玩家可改配置扩容；默认 3 → 308 弹箱 48×3=144）。此前只用 ammo.stackSize（48），
+            // 玩家改 AmmoBoxStackSize 配置不生效。
+            return (stackSize * LegacyConfigManager.server.ammoBoxStackSize).coerceAtLeast(1)
         }
 
     private fun readAmmoStack(): ItemStack {

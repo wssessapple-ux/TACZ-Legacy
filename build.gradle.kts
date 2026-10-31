@@ -182,6 +182,8 @@ dependencies {
     implementation(rfg.deobf("curse.maven:ctm-267602:2915363"))
     implementation(rfg.deobf("curse.maven:codechickenlib-242818:2779848"))
 
+    implementation(rfg.deobf("curse.maven:jei-238222:5101333"))
+
     testImplementation("junit:junit:4.13.2")
     
     if (use_assetmover.toBoolean()) {

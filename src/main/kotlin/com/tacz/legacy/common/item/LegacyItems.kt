@@ -316,7 +316,9 @@ internal class AmmoBoxItem : Item(), IAmmoBox {
         ammos.forEach { (ammoId, _) ->
             val stack = ItemStack(this)
             setAmmoId(stack, ammoId)
-            val capacity = snapshot.ammos[ammoId]?.stackSize ?: 64
+            val baseStack = snapshot.ammos[ammoId]?.stackSize ?: 64
+            // 兼容层 ③ C7：创意弹箱容量与玩法侧一致（弹药 stackSize × ammoBoxStackSize 配置）
+            val capacity = (baseStack * LegacyConfigManager.server.ammoBoxStackSize).coerceAtLeast(1)
             setAmmoCount(stack, capacity)
             items += stack
         }

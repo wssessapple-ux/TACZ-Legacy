@@ -3,8 +3,13 @@
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.event.EntityHurtByGunEvent
 import com.tacz.legacy.api.event.EntityKillByGunEvent
+import com.tacz.legacy.api.modifier.Modifier
 import com.tacz.legacy.common.resource.BulletCombatData
 import com.tacz.legacy.common.resource.DistanceDamagePoint
+import com.tacz.legacy.common.resource.TACZAttachmentModifierRegistry
+import com.tacz.legacy.common.resource.TACZExplosionModifierValue
+import com.tacz.legacy.common.resource.TACZGunPropertyResolver
+import com.tacz.legacy.common.resource.TACZIgniteValue
 import com.tacz.legacy.common.config.HeadShotAabbConfigRead
 import com.tacz.legacy.common.config.LegacyConfigManager
 import com.tacz.legacy.common.network.TACZNetworkHandler
@@ -16,6 +21,7 @@ import net.minecraft.entity.EntityList
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.item.EntityMinecartEmpty
 import net.minecraft.entity.projectile.EntityThrowable
+import net.minecraft.entity.monster.EntityEnderman
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
 import net.minecraft.init.Blocks
@@ -115,12 +121,15 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
     private var shooterEntityId: Int = -1
 
     // Explosion properties
+    private var hasExplosionData: Boolean = false
     private var hasExplosion: Boolean = false
     private var explosionRadius: Float = 0f
     private var explosionDamage: Float = 0f
     private var explosionKnockback: Boolean = false
     private var explosionDestroyBlock: Boolean = false
     private var explosionDelay: Float = 0f
+    /** 配置伤害倍率是否已烘进 damage / damageAdjust（见 bakeDamageBaseMultiplier） */
+    private var damageBaseBaked: Boolean = false
 
     /** 发射的枪械 ID，供下游渲染/音效使用 */
     internal var gunId: ResourceLocation = ResourceLocation(TACZLegacy.MOD_ID, "unknown")
@@ -179,6 +188,9 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         this.damageAdjust.addAll(extraDamage?.damageAdjust.orEmpty())
         
         val exp = bulletData.explosionData
+        // 兼容层 ③ C2-exp：hasExplosionData = 是否写了 explosion 段（与是否点亮无关），
+        // 供配件爆炸聚合判断默认基线（上游 ExplosionModifier.initCache 的 hasData 语义）。
+        this.hasExplosionData = exp != null
         if (exp != null && exp.explode) {
             this.hasExplosion = true
             this.explosionRadius = exp.radius
@@ -193,6 +205,105 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
     internal fun applyShotgunDamageSpread(bulletCount: Int) {
         if (bulletCount > 1) {
             damageModifier = 1.0f / bulletCount
+        }
+    }
+
+    /** 应用配件点燃 modifier（配件 ignite 覆盖枪械基础点燃属性）。 */
+    internal fun applyAttachmentIgnite(ignite: TACZIgniteValue) {
+        this.igniteEntity = ignite.igniteEntity
+        this.igniteBlock = ignite.igniteBlock
+    }
+
+    // 兼容层 ③：配件 modifier 接入子弹属性（armor_ignore/head_shot/pierce）。
+    // 用子弹当前值作为 default，eval 配件 modifier 后覆盖（对齐上游 EntityKineticBullet 读缓存）。
+    // 注意这里的下限/区间不是"额外 clamp"：上游子弹构造器同样在 eval 之后做
+    // armorIgnore.clamp(0,1)、headShot.max(0)、pierce.clamp(1,MAX)。
+    // knockback 已豁免：命中击退已完全移除（applyImpactKnockback 已删），
+    // 接入配件 knockback modifier 没有实际消费点，见守门测试登记注释。
+    internal fun applyAttachmentModifiers(mods: TACZGunPropertyResolver.AttachmentModifierLists) {
+        val registry = TACZAttachmentModifierRegistry
+        if (mods.armorIgnore.isNotEmpty()) {
+            armorIgnore = registry.evalNumeric(mods.armorIgnore, armorIgnore.toDouble()).toFloat().coerceIn(0f, 1f)
+        }
+        if (mods.headShot.isNotEmpty()) {
+            headShotMultiplier = registry.evalNumeric(mods.headShot, headShotMultiplier.toDouble()).toFloat().coerceAtLeast(0f)
+        }
+        if (mods.pierce.isNotEmpty()) {
+            // 上游 PierceModifier：eval 后 clamp(1, MAX)。0 或负数会被上游抬到 1，
+            // 这里也必须抬到 1，否则 onUpdate 会在第一只目标后直接销毁子弹。
+            pierce = Math.round(registry.evalNumeric(mods.pierce, pierce.toDouble())).toInt().coerceAtLeast(1)
+        }
+    }
+
+    // 兼容层 ③ C1-2：配件 damage modifier 逐距离段 eval（对齐上游 DamageModifier.java:77-86，
+    // 对 damageAdjust 列表的每个距离点分别套用 eval 公式），无 modifier 时不覆盖
+    internal fun applyAttachmentDamageModifier(modifiers: List<Modifier>) {
+        if (modifiers.isEmpty()) return
+        val registry = TACZAttachmentModifierRegistry
+        // 审计 B1-9：配置倍率必须先烘进基准值再 eval（上游 DamageModifier.initCache 先
+        // (base + fireAdjust) * DAMAGE_BASE_MULTIPLIER，之后才 eval 配件），
+        // 否则配件的**绝对值** addend 会被一起乘倍率，语义就偏了。
+        bakeDamageBaseMultiplier()
+        damage = registry.evalNumeric(modifiers, damage.toDouble()).toFloat()
+        for (i in damageAdjust.indices) {
+            val point = damageAdjust[i]
+            damageAdjust[i] = point.copy(
+                damage = registry.evalNumeric(modifiers, point.damage.toDouble()).toFloat(),
+            )
+        }
+    }
+
+    // 兼容层 ③ C2-ext：effective_range 修正距离衰减曲线第一段的距离（对齐上游
+    // EffectiveRangeModifier.java:39-51 + EntityKineticBullet）
+    internal fun applyAttachmentEffectiveRange(modifiers: List<Modifier>) {
+        if (modifiers.isEmpty() || damageAdjust.isEmpty()) return
+        val registry = TACZAttachmentModifierRegistry
+        val firstPoint = damageAdjust[0]
+        val newDistance = registry.evalNumeric(modifiers, firstPoint.distance.toDouble()).toFloat()
+        damageAdjust[0] = firstPoint.copy(distance = newDistance)
+    }
+
+    // 兼容层 ③ C2-exp：explosion 聚合（对齐上游 ExplosionModifier.eval:45-79）
+    // 计算本体在 TACZExplosionAggregation（纯函数，可单测）；这里只负责把结果写回子弹字段。
+    // 入参是解析期成型的 typed 值（TACZExplosionModifierReader），不在每发子弹路径上碰 Gson。
+    internal fun applyAttachmentExplosion(explosions: List<TACZExplosionModifierValue>) {
+        val aggregated = TACZExplosionAggregation.aggregate(
+            TACZExplosionAggregation.Base(
+                hasData = hasExplosionData,
+                explode = hasExplosion,
+                radius = explosionRadius,
+                damage = explosionDamage,
+                knockback = explosionKnockback,
+                destroyBlock = explosionDestroyBlock,
+                delay = explosionDelay,
+            ),
+            explosions,
+        ) ?: return
+
+        hasExplosion = true
+        explosionRadius = aggregated.radius
+        explosionDamage = aggregated.damage
+        explosionKnockback = aggregated.knockback
+        explosionDestroyBlock = aggregated.destroyBlock
+        explosionDelay = aggregated.delay
+    }
+
+    /**
+     * 把配置项 `damage_base_multiplier` 烘进基准伤害与距离曲线各档。
+     *
+     * 审计 B1-9：旧实现在结算处事后相乘，配件的**绝对值** modifier 会被一起乘 ——
+     * `damage:{"addend":5}` 在上游是 `base*m + 5`，在移植版是 `(base + 5) * m`。
+     * 默认包只用 multiplier/percent（比例不变）且 m 默认 1.0，现网不可见，但语义确实偏了。
+     * 幂等：只烘一次；无配件的枪在首次结算处补烘，保证任何路径都恰好乘一遍。
+     */
+    private fun bakeDamageBaseMultiplier() {
+        if (damageBaseBaked) return
+        damageBaseBaked = true
+        val multiplier = LegacyConfigManager.server.damageBaseMultiplier.toFloat()
+        if (multiplier == 1.0f) return
+        damage *= multiplier
+        for (i in damageAdjust.indices) {
+            damageAdjust[i] = damageAdjust[i].let { point -> point.copy(damage = point.damage * multiplier) }
         }
     }
 
@@ -594,15 +705,15 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         }
         var applied = false
         if (damageSplit.first > 0.0f) {
-            applied = target.attackEntityFrom(createBulletDamageSource(ignoreArmor = false), damageSplit.first) || applied
+            applied = target.attackEntityFrom(createBulletDamageSource(target, ignoreArmor = false), damageSplit.first) || applied
         }
         if (damageSplit.second > 0.0f) {
             if (target is EntityLivingBase) {
                 target.hurtResistantTime = 0
             }
-            applied = target.attackEntityFrom(createBulletDamageSource(ignoreArmor = true), damageSplit.second) || applied
+            applied = target.attackEntityFrom(createBulletDamageSource(target, ignoreArmor = true), damageSplit.second) || applied
         }
-        applyImpactKnockback(target)
+        // 原版 TaCZ 子弹无击退，移植对齐：移除命中击退（knockback 字段保留用于存档兼容与爆炸配置）。
         if (igniteEntity && !target.world.isRemote && LegacyConfigManager.common.igniteEntity) {
             target.setFire(igniteEntityTime)
         }
@@ -680,36 +791,34 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         )
     }
 
-    private fun createBulletDamageSource(ignoreArmor: Boolean): DamageSource {
-        val damageSource = DamageSource.causeThrownDamage(this, thrower).setProjectile()
-        return if (ignoreArmor) damageSource.setDamageBypassesArmor() else damageSource
-    }
-
-    private fun applyImpactKnockback(target: Entity) {
-        if (knockback <= 0.0f) {
-            return
+    private fun createBulletDamageSource(target: Entity?, ignoreArmor: Boolean): DamageSource {
+        val damageSource = if (target is EntityEnderman && thrower is EntityLivingBase) {
+            // 末影人对 EntityThrowable 会瞬移躲子弹（1.12.2 原版分支）。
+            // 对末影人改用非抛射伤害源（immediateSource=射手，非 EntityThrowable），
+            // 使其走原版 else 正常伤害、不瞬移；对齐官方高版本"末影人几乎躲不了子弹"。
+            DamageSource.causeMobDamage(thrower)
+        } else {
+            DamageSource.causeThrownDamage(this, thrower)
         }
-        val horizontalSpeed = sqrt(motionX * motionX + motionZ * motionZ)
-        if (horizontalSpeed <= 1.0E-6) {
-            return
-        }
-        val normX = motionX / horizontalSpeed
-        val normZ = motionZ / horizontalSpeed
-        target.addVelocity(normX * knockback * 0.6, 0.1, normZ * knockback * 0.6)
-        target.velocityChanged = true
+        val src = if (ignoreArmor) damageSource.setDamageBypassesArmor() else damageSource
+        return src.setProjectile()
     }
 
     private fun resolveEffectiveDamageAt(hitPosition: Vec3d): Float {
+        bakeDamageBaseMultiplier()
         val origin = Vec3d(startPosX, startPosY, startPosZ)
         val travelDistance = origin.distanceTo(hitPosition)
         val adjustedDamage = if (damageAdjust.isEmpty()) {
             damage
         } else {
-            damageAdjust.firstOrNull { travelDistance < it.distance || it.distance.isInfinite() }?.damage
-                ?: damageAdjust.last().damage
+            // 审计 B1-10：超出最后一个**有限**距离档 → 0（对齐上游 getDamage，
+            // "如果忘记写最大值，那我就直接认为你伤害为 0"），不是回落末档伤害。
+            // 末档写成 infinity 的枪两条路径一致。
+            damageAdjust.firstOrNull { travelDistance < it.distance || it.distance.isInfinite() }?.damage ?: 0f
         }
-        return (adjustedDamage * LegacyConfigManager.server.damageBaseMultiplier.toFloat() * damageModifier)
-            .coerceAtLeast(0.0f)
+        // 顺序对齐上游：距离曲线伤害（已含配置倍率，见 bakeDamageBaseMultiplier）* 霰弹分摊（damageModifier），
+        // 最后统一抬到 0。注意：配置倍率已烘进 damage/damageAdjust，这里不再乘 damage_base_multiplier。
+        return (adjustedDamage * damageModifier).coerceAtLeast(0.0f)
     }
 
     private fun splitDamage(totalDamage: Float): Pair<Float, Float> {

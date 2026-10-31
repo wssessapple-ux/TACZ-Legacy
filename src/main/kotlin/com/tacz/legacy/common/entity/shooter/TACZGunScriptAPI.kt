@@ -316,11 +316,15 @@ internal class TACZGunScriptAPI {
 
     fun getShootInterval(): Long {
         val data = gunData ?: return 0L
-        val fireMode = iGun?.getFireMode(itemStack) ?: return 0L
+        val gun = iGun ?: return 0L
+        val fireMode = gun.getFireMode(itemStack)
         val coolDown = if (fireMode == FireMode.BURST) {
             (data.burstMinInterval * 1000f).toLong()
         } else {
-            data.getShootIntervalMs()
+            // C1-3：接入配件 rpm modifier
+            data.getShootIntervalMs(
+                com.tacz.legacy.common.resource.TACZGunPropertyResolver.collectGunNumericModifiers(itemStack, gun, "rpm"),
+            )
         }
         return (coolDown - 5).coerceAtLeast(0L)
     }

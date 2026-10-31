@@ -1,15 +1,18 @@
 package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.entity.ReloadState
+import com.tacz.legacy.api.entity.ShootResult
 import com.tacz.legacy.api.event.GunReloadEvent
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.common.application.refit.LegacyGunRefitRuntime
 import com.tacz.legacy.common.network.TACZNetworkHandler
 import com.tacz.legacy.common.network.message.event.ServerMessageReload
+import com.tacz.legacy.common.network.message.event.ServerMessageShootState
 import com.tacz.legacy.common.resource.BoltType
 import com.tacz.legacy.common.resource.GunCombatData
 import com.tacz.legacy.common.resource.GunDataAccessor
 import net.minecraft.entity.EntityLivingBase
+import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.relauncher.Side
 import org.luaj.vm2.lib.jse.CoerceJavaToLua
@@ -39,6 +42,8 @@ public class LivingEntityReload(
         if (draw.getDrawCoolDown() != 0L) return
         // 在拉栓
         if (data.isBolting) return
+        // 射击冷却中不换弹（对齐官方：开火未完禁止换弹，避免射击/换弹状态机冲突）
+        if (com.tacz.legacy.api.entity.IGunOperator.fromLivingEntity(shooter).getSynShootCoolDown() > 0L) return
 
         val currentAmmo = iGun.getCurrentAmmoCount(currentGunItem)
         val hasBulletInBarrel = iGun.hasBulletInBarrel(currentGunItem)
@@ -252,6 +257,23 @@ public class LivingEntityReload(
             if (removed != 0) {
                 api.setAmmoInBarrel(true)
             }
+        }
+
+        // 服务端补弹完成后，回传实际弹匣数给玩家客户端（复用 ServerMessageShootState，SUCCESS 不触发取消连发副作用）。
+        // 根因：客户端 tickReload 也在跑 defaultReloadFinishing，用预测值（consumeAmmoFromPlayer 客户端直接返回 neededAmount）
+        // 把弹匣写满；服务端从背包实际提取可能不足（弹药不够/类型不匹配），两端不一致 →
+        // 客户端显示满弹匣、服务端实际为空，开枪即空枪。以服务端权威覆盖即可消除。
+        if (!shooter.world.isRemote && shooter is EntityPlayerMP) {
+            val gunItem = shooter.heldItemMainhand
+            val iGunNow = gunItem.item as? IGun
+            val gunIdNow = iGunNow?.getGunId(gunItem)?.toString()
+            val actualAmmo = api.getAmmoAmount()
+            val heatNow = iGunNow?.getHeatAmount(gunItem) ?: 0f
+            val lockedNow = iGunNow?.isOverheatLocked(gunItem) ?: false
+            TACZNetworkHandler.sendToPlayer(
+                ServerMessageShootState(ShootResult.SUCCESS, gunIdNow, actualAmmo, heatNow, lockedNow),
+                shooter,
+            )
         }
     }
 }

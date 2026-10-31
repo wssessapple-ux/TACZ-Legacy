@@ -9,9 +9,12 @@ import net.minecraftforge.fml.common.versioning.VersionParser
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.Pattern
@@ -132,6 +135,8 @@ internal object TACZPackConvertor {
         private val tagsPattern: Pattern = Pattern.compile("^(\\w+)/tags/([\\w/.-]+)$", Pattern.CASE_INSENSITIVE)
         private val recipePattern: Pattern = Pattern.compile("^(\\w+)/recipes/([\\w/.-]+)$", Pattern.CASE_INSENSITIVE)
         private val packInfoPattern: Pattern = Pattern.compile("^(\\w+)/pack\\.json$", Pattern.CASE_INSENSITIVE)
+        // B10：zip 条目名里出现盘符前缀（`C:`）即视为绝对路径。
+        private val driveLetterPattern: Pattern = Pattern.compile("^[A-Za-z]:.*")
 
         fun convertTo(targetDirectory: File): File {
             targetDirectory.mkdirs()
@@ -140,9 +145,14 @@ internal object TACZPackConvertor {
             if (targetFile.exists()) {
                 throw FileAlreadyExistsException(targetFile.absolutePath)
             }
-            ZipFile(file).use { oldPack ->
-                FileOutputStream(targetFile).use { output ->
-                    ZipOutputStream(output).use { newZip ->
+            // B10：先写同目录临时文件，全部条目写成功后再原子改名到目标。
+            // 临时文件必须与目标同目录，rename 才可能是原子的（跨文件系统会退化为复制）。
+            // 中途异常（坏 recipe JSON、非法条目名等）只会留下临时文件（并在 finally 前删除），
+            // 绝不会留下截断的 _converted.zip 被下一次运行当成"已存在"而永久跳过。
+            val tempFile = File(targetDirectory, "$newName.tmp-${System.nanoTime()}")
+            try {
+                ZipFile(file).use { oldPack ->
+                    ZipOutputStream(FileOutputStream(tempFile)).use { newZip ->
                         addMeta(newZip)
                         Collections.list(oldPack.entries()).forEach { entry ->
                             if (parseDisplay(newZip, entry, oldPack)) return@forEach
@@ -160,8 +170,32 @@ internal object TACZPackConvertor {
                         }
                     }
                 }
+                publish(tempFile, targetFile)
+                return targetFile
+            } catch (throwable: Throwable) {
+                // 失败路径：删除临时文件，绝不把半成品暴露成目标文件；删除失败只记日志，不掩盖原始异常。
+                if (!tempFile.delete() && tempFile.exists()) {
+                    TACZLegacy.logger.warn("[GunPackConvert] Failed to delete temporary file {}", tempFile.absolutePath)
+                }
+                throw throwable
             }
-            return targetFile
+        }
+
+        /**
+         * B10：把写好的临时文件发布成目标文件。
+         *
+         * `ATOMIC_MOVE` 下其余选项按 javadoc 会被忽略，但同目录 rename 在 Windows/Linux 上
+         * 本身就会覆盖已存在目标，因此额外带上 `REPLACE_EXISTING` 表达意图。
+         * 少数文件系统（部分网络盘）不支持原子移动，此时退化为普通移动——仍比直接写目标安全。
+         */
+        private fun publish(tempFile: File, targetFile: File): Unit {
+            val source = tempFile.toPath()
+            val target = targetFile.toPath()
+            try {
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING)
+            }
         }
 
         private fun parsePackInfo(newZip: ZipOutputStream, entry: ZipEntry, oldPack: ZipFile): Boolean =
@@ -178,7 +212,7 @@ internal object TACZPackConvertor {
             oldPack.getInputStream(entry).bufferedReader(StandardCharsets.UTF_8).use { reader ->
                 val objectNode = parseObject(reader.readText())
                 objectNode.addProperty("type", "tacz:gun_smith_table_crafting")
-                newZip.putNextEntry(ZipEntry(newPath))
+                putEntry(newZip, newPath)
                 newZip.write(TACZJson.GSON.toJson(objectNode).toByteArray(StandardCharsets.UTF_8))
                 newZip.closeEntry()
             }
@@ -234,15 +268,43 @@ internal object TACZPackConvertor {
         }
 
         private fun writeEntry(newZip: ZipOutputStream, entry: ZipEntry, oldPack: ZipFile, newPath: String): Unit {
-            newZip.putNextEntry(ZipEntry(newPath))
+            putEntry(newZip, newPath)
             oldPack.getInputStream(entry).use { input ->
                 input.copyTo(newZip)
             }
             newZip.closeEntry()
         }
 
+        /**
+         * B10：所有条目都必须经过这里写入。
+         *
+         * 旧包条目名会经由各 `*Pattern` 的捕获组拼进新路径，而这些正则允许 `.` 与 `/`，
+         * 因此 `../` 能穿过匹配进入 `ZipEntry`。产出的 `_converted.zip` 会被下游解压
+         * （资源包加载器、人工解压），带 `..` 的条目名就是 zip-slip 载荷。
+         */
+        private fun putEntry(newZip: ZipOutputStream, newPath: String): Unit {
+            requireSafeEntryName(newPath)
+            newZip.putNextEntry(ZipEntry(newPath))
+        }
+
+        /**
+         * B10：条目名安全校验（只校验字符串，不解压、不触碰文件系统）。
+         *
+         * 规则：非空；不含反斜杠（部分解压器把 `\` 当分隔符）；不以 `/` 开头；
+         * 不匹配盘符前缀（`C:`）；按 `/` 分段后不得出现 `..`。
+         * 正常条目（`assets/...`、`data/...`、`gunpack.meta.json`）不受影响。
+         * 不合法直接抛 [IllegalArgumentException]，由 `handleConvert` 计入 failed。
+         */
+        private fun requireSafeEntryName(entryName: String) {
+            require(entryName.isNotEmpty()) { "Illegal zip entry name: empty" }
+            require(!entryName.contains('\\')) { "Illegal zip entry name (backslash): $entryName" }
+            require(!entryName.startsWith("/")) { "Illegal zip entry name (absolute path): $entryName" }
+            require(!driveLetterPattern.matcher(entryName).matches()) { "Illegal zip entry name (drive prefix): $entryName" }
+            require(entryName.split('/').none { it == ".." }) { "Illegal zip entry name (path traversal): $entryName" }
+        }
+
         private fun addMeta(newZip: ZipOutputStream): Unit {
-            newZip.putNextEntry(ZipEntry("gunpack.meta.json"))
+            putEntry(newZip, "gunpack.meta.json")
             val meta = TACZPackMeta(name = namespace)
             newZip.write(TACZJson.GSON.toJson(meta).toByteArray(StandardCharsets.UTF_8))
             newZip.closeEntry()

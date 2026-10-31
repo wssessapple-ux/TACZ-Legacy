@@ -51,6 +51,58 @@ internal object TACZGunPropertyResolver {
         }
     }
 
+    /**
+     * 兼容层 ③ C1-1：收集枪上所有配件对某属性的 numeric modifier（GUI 与玩法共用同一实现）。
+     * 注：未含 C10 exclusive_attachments 整份替换（独立治理项），直接按装配的配件 id 索引。
+     */
+    internal fun collectNumericModifiers(
+        snapshot: TACZRuntimeSnapshot,
+        attachmentIds: List<ResourceLocation>,
+        key: String,
+    ): List<Modifier> {
+        return attachmentIds.mapNotNull { attachmentId ->
+            snapshot.attachments[attachmentId]?.data?.modifiers?.get(key)?.getValue() as? Modifier
+        }
+    }
+
+    /** 兼容层 ③ C1-5：子弹战斗属性 modifier 的集合（armor_ignore/head_shot/pierce/damage/ammo_speed/effective_range）。 */
+    internal data class AttachmentModifierLists(
+        val armorIgnore: List<Modifier>,
+        val headShot: List<Modifier>,
+        val pierce: List<Modifier>,
+        val damage: List<Modifier>,
+        val ammoSpeed: List<Modifier>,
+        val effectiveRange: List<Modifier>,
+        // 兼容层 ③ C2-exp：explosion 在解析期已由 TACZExplosionModifierReader 转成 typed 值
+        val explosion: List<TACZExplosionModifierValue>,
+    )
+
+    /** 兼容层 ③：收集枪上所有配件的子弹战斗属性 modifier，供玩法侧 eval 后覆盖子弹属性。 */
+    internal fun collectAttachmentModifiers(stack: ItemStack, iGun: IGun): AttachmentModifierLists {
+        val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
+        val attachmentIds = collectAttachmentIds(stack, iGun)
+        return AttachmentModifierLists(
+            armorIgnore = collectNumericModifiers(snapshot, attachmentIds, "armor_ignore"),
+            headShot = collectNumericModifiers(snapshot, attachmentIds, "head_shot"),
+            pierce = collectNumericModifiers(snapshot, attachmentIds, "pierce"),
+            damage = collectNumericModifiers(snapshot, attachmentIds, "damage"),
+            ammoSpeed = collectNumericModifiers(snapshot, attachmentIds, "ammo_speed"),
+            effectiveRange = collectNumericModifiers(snapshot, attachmentIds, "effective_range"),
+            // C2-exp：explosion 整份走 snapshot 直接索引（无 C10 独占替换时即生效 data）
+            explosion = attachmentIds.mapNotNull { attachmentId ->
+                snapshot.attachments[attachmentId]?.data?.modifiers?.get("explosion")?.getValue() as? TACZExplosionModifierValue
+            },
+        )
+    }
+
+    /** 兼容层 ③ C1-3/C1-4：按单个属性键收集当前枪配件的 numeric modifier（射速、开镜时长等）。 */
+    internal fun collectGunNumericModifiers(stack: ItemStack, iGun: IGun, key: String): List<Modifier> {
+        val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
+        val attachmentIds = collectAttachmentIds(stack, iGun)
+        if (attachmentIds.isEmpty()) return emptyList()
+        return collectNumericModifiers(snapshot, attachmentIds, key)
+    }
+
     internal fun resolveBulletAmount(stack: ItemStack, iGun: IGun, gunData: GunCombatData): Int {
         val extendedMagId = resolveCurrentAttachmentId(stack, iGun, AttachmentType.EXTENDED_MAG)
         return if (matchesAttachmentTag(extendedMagId, SLUG_TAG)) {
