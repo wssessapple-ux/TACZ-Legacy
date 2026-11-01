@@ -465,7 +465,9 @@ addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6,
         val player = mc.player ?: return
         if (!LegacyGunSmithingRuntime.canCraft(player, recipe)) {
             TACZLegacy.logger.warn("GunSmith craft blocked client-side: insufficient materials for {}", recipe.id)
-            player.sendChatMessage("Missing materials: " + recipe.result.displayName)
+            // 不再走聊天通道提示缺料：sendChatMessage 会被服务端按非法聊天字符校验踢出
+            // （尤其第三方枪包物品未本地化、displayName 含非法字符时必现）。合成按钮已按
+            // canCraft 禁用，此缺料分支仅作兜底，静默返回即可。
             return
         }
         TACZNetworkHandler.sendToServer(ClientMessageGunSmithCraft(menu.windowId, recipe.id))

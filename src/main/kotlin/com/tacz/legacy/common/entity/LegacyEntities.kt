@@ -26,6 +26,7 @@ import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
 import net.minecraft.init.Blocks
 import net.minecraft.util.DamageSource
+import net.minecraft.util.EntityDamageSource
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.math.MathHelper
@@ -337,7 +338,22 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         val interpolatedX = shooter.lastTickPosX + (shooter.posX - shooter.lastTickPosX) / 2.0
         val interpolatedY = shooter.lastTickPosY + (shooter.posY - shooter.lastTickPosY) / 2.0 + shooter.eyeHeight.toDouble()
         val interpolatedZ = shooter.lastTickPosZ + (shooter.posZ - shooter.lastTickPosZ) / 2.0
-        setPosition(interpolatedX, interpolatedY, interpolatedZ)
+        // 修复"子弹一发射就在玩家眼前/头上 + 贴脸秒炸 + 打僵尸像空弹"（QA：爆炸配件打自己头）：
+        // 原实现在玩家眼睛位置（身体内）生成子弹，贴脸时射线直接命中眼前方块→爆炸中心在眼前，
+        // 弹道起点卡在身体内也会打不中目标。改为沿视线前移一个枪口偏移量，让子弹从身前
+        // 枪口处出膛，脱离玩家自身 AABB 与眼前方块，弹道正常。spread=0 得纯瞄准方向（单位向量）。
+        val dir = computeShotDirection(
+            shooter.rotationPitch.toDouble(),
+            shooter.rotationYaw.toDouble(),
+            0.0,
+            0.0,
+        )
+        val muzzleOffset = 0.9
+        setPosition(
+            interpolatedX + dir.x * muzzleOffset,
+            interpolatedY + dir.y * muzzleOffset,
+            interpolatedZ + dir.z * muzzleOffset,
+        )
     }
 
     /** 获取实际伤害（含霰弹分摊） */
@@ -792,14 +808,17 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
     }
 
     private fun createBulletDamageSource(target: Entity?, ignoreArmor: Boolean): DamageSource {
-        val damageSource = if (target is EntityEnderman && thrower is EntityLivingBase) {
-            // 末影人对 EntityThrowable 会瞬移躲子弹（1.12.2 原版分支）。
-            // 对末影人改用非抛射伤害源（immediateSource=射手，非 EntityThrowable），
-            // 使其走原版 else 正常伤害、不瞬移；对齐官方高版本"末影人几乎躲不了子弹"。
-            DamageSource.causeMobDamage(thrower)
-        } else {
-            DamageSource.causeThrownDamage(this, thrower)
+        if (target is EntityEnderman && thrower is EntityLivingBase) {
+            // 对齐官方 1.20.1（MCModderAnchor/TACZ：use_magic_damage_on → 末影人免瞬移）。
+            // 注意：官方 1.20.1 判定是 source.isProjectile()，indirectMagic 非 projectile 故不瞬移；
+            // 而 1.12.2 判定是 source instanceof EntityDamageSourceIndirect —— 任何该子类都触发瞬移
+            //（连原版 causeIndirectMagicDamage 都是它）。故这里改用非 indirect 的 EntityDamageSource，
+            // 走 EntityEnderman.attackEntityFrom 的 else 分支 → 掉血、不瞬移。
+            // 不设 setDamageBypassesArmor()：否则 isUnblockable=true 会 10% 概率瞬移，
+            // 同时对齐官方 use_magic_damage_on 的"不穿甲"。trueSource=射手 → 保留仇恨与正常反击。
+            return EntityDamageSource("indirectMagic", thrower).setMagicDamage()
         }
+        val damageSource = DamageSource.causeThrownDamage(this, thrower)
         val src = if (ignoreArmor) damageSource.setDamageBypassesArmor() else damageSource
         return src.setProjectile()
     }
