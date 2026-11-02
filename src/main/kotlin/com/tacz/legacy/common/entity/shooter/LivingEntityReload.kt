@@ -43,7 +43,10 @@ public class LivingEntityReload(
         // 在拉栓
         if (data.isBolting) return
         // 射击冷却中不换弹（对齐官方：开火未完禁止换弹，避免射击/换弹状态机冲突）
-        if (com.tacz.legacy.api.entity.IGunOperator.fromLivingEntity(shooter).getSynShootCoolDown() > 0L) return
+        // [0.6.4-REV] 已放宽：删除射击冷却拦截。QA 实测开完火/疾跑扫射按 R 换弹被冷却窗口吞掉
+        // （刚开完火失败、狂按 R 一成一败、疾跑扫射 100% 失败、等冷却走完才成功），
+        // 均源于此处 return。换弹状态机有满弹判定兜底（见下方 currentAmmo>=maxAmmo），
+        // 玩家主动按 R 即放弃继续射击，射击冷却不再拦截换弹。
 
         val currentAmmo = iGun.getCurrentAmmoCount(currentGunItem)
         val hasBulletInBarrel = iGun.hasBulletInBarrel(currentGunItem)
@@ -245,6 +248,10 @@ public class LivingEntityReload(
         // 根据弹药类型补弹（上游 MAGAZINE / FUEL 两种路径）
         if (needConsumeAmmo) {
             val consumed = api.consumeAmmoFromPlayer(needAmmoCount)
+            // 客户端也预测写弹匣，避免补弹后弹匣冻结在 0（纯等服务端回传会滞后/丢失，
+            // QA 实测"换弹后子弹几乎还是0"即此副作用）。
+            // 服务端在函数末尾以 ServerMessageShootState(actualAmmo) 回传实际弹匣数纠正客户端，
+            // 解决"客户端显示满、服务端扣不足"的假弹/空枪（以服务端权威覆盖预测值）。
             api.putAmmoInMagazine(consumed)
         } else {
             api.putAmmoInMagazine(needAmmoCount)

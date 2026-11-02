@@ -1,5 +1,6 @@
 ﻿package com.tacz.legacy.common.entity.shooter
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.DefaultAssets
 import com.tacz.legacy.api.event.GunMeleeEvent
 import com.tacz.legacy.api.item.IGun
@@ -224,6 +225,10 @@ public class LivingEntityMelee(
 
     private fun applyMeleeKnockback(target: EntityLivingBase, knockback: Float, direction: Vec3d) {
         if (knockback <= 0.0f) return
+        TACZLegacy.logger.info(
+            "[KnockbackTrace] MELEE applyKnockback to {} strength={} dir=({}, {}, {}) (ungated)",
+            target.name, knockback, direction.x, direction.y, direction.z,
+        )
         target.addVelocity(direction.x * knockback * 0.6, 0.1, direction.z * knockback * 0.6)
         target.velocityChanged = true
     }

@@ -20,11 +20,20 @@ import net.minecraft.util.text.TextComponentString
  * 弹药箱的内部虚拟库存：单个槽位映射到弹药箱 ItemStack 的 NBT（AmmoId + AmmoCount）。
  * GUI 中的"弹药槽"读/写都直接落到弹箱 NBT 上，保证服务端/客户端一致，且不产生独立物品实体。
  */
-internal class AmmoBoxInventory(private val box: ItemStack) : IInventory {
+internal class AmmoBoxInventory(
+    private val player: EntityPlayer,
+    private val box: ItemStack,
+) : IInventory {
     private val boxAmmo: IAmmoBox get() = box.item as IAmmoBox
 
+    /** 主手仍是打开时那把弹药箱才允许读写；主手被换/拿起后立即视为空箱，避免引用悬空（QA 实测：GUI 里把弹药箱拿了就卡死）。 */
+    private fun isStillHeld(): Boolean {
+        val held = player.heldItemMainhand
+        return !held.isEmpty && held.item === box.item
+    }
+
     /** 箱内弹药口径；空箱返回 EMPTY_AMMO_ID */
-    internal val ammoId: ResourceLocation get() = boxAmmo.getAmmoId(box)
+    internal val ammoId: ResourceLocation get() = if (isStillHeld()) boxAmmo.getAmmoId(box) else DefaultAssets.EMPTY_AMMO_ID
 
     /** 当前口径弹药的最大堆叠上限（来自枪包数据 × ammoBoxStackSize 配置） */
     internal val maxStackLimit: Int
@@ -39,6 +48,7 @@ internal class AmmoBoxInventory(private val box: ItemStack) : IInventory {
         }
 
     private fun readAmmoStack(): ItemStack {
+        if (!isStillHeld()) return ItemStack.EMPTY
         val id = boxAmmo.getAmmoId(box)
         if (id == DefaultAssets.EMPTY_AMMO_ID) return ItemStack.EMPTY
         val count = boxAmmo.getAmmoCount(box)
@@ -50,6 +60,7 @@ internal class AmmoBoxInventory(private val box: ItemStack) : IInventory {
     }
 
     private fun writeAmmoStack(stack: ItemStack) {
+        if (!isStillHeld()) return
         val iAmmo = stack.item as? IAmmo
         if (stack.isEmpty || iAmmo == null || iAmmo.getAmmoId(stack) == DefaultAssets.EMPTY_AMMO_ID || stack.count <= 0) {
             boxAmmo.setAmmoId(box, DefaultAssets.EMPTY_AMMO_ID)
@@ -142,7 +153,7 @@ internal class AmmoBoxContainer(
     /** 弹药箱本体：玩家当前手持的物品（右键打开时） */
     internal val ammoBox: ItemStack = player.heldItemMainhand
 
-    internal val ammoInventory = AmmoBoxInventory(ammoBox)
+    internal val ammoInventory = AmmoBoxInventory(player, ammoBox)
 
     init {
         // 弹药槽 (index 0)

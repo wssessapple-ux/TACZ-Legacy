@@ -30,3 +30,6 @@ run
 
 # local agent workflow workspace
 .agent-workspace/
+
+# released jars
+releases/

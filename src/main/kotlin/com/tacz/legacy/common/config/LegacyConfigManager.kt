@@ -18,7 +18,7 @@ internal data class CommonConfigValues(
     var autoReloadWhenRespawn: Boolean = false,
     var explosiveAmmoDestroysBlock: Boolean = true,
     var explosiveAmmoFire: Boolean = false,
-    var explosiveAmmoKnockBack: Boolean = true,
+    var explosiveAmmoKnockBack: Boolean = false,
     var explosiveAmmoVisibleDistance: Int = 192,
     var passThroughBlocks: List<String> = emptyList(),
     var destroyGlass: Boolean = true,
@@ -217,7 +217,7 @@ internal object LegacyConfigManager {
                 "Warning: Ammo with explosive properties can set surroundings on fire."
             )
             common.explosiveAmmoKnockBack = cfg.getBoolean(
-                "ExplosiveAmmoKnockBack", "ammo", true,
+                "ExplosiveAmmoKnockBack", "ammo", false,
                 "Ammo with explosive properties can add knockback effect."
             )
             common.explosiveAmmoVisibleDistance = cfg.getInt(

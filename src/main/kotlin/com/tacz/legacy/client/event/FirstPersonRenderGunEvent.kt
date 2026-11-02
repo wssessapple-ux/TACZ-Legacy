@@ -133,6 +133,10 @@ internal object FirstPersonRenderGunEvent {
     private var jumpingTimeStamp = -1L
 
 
+    private fun isGuiOpen(): Boolean {
+        return Minecraft.getMinecraft().currentScreen != null
+    }
+
     @JvmStatic
     fun getPreparedAimingProgress(): Float? = preparedRenderContext?.aimingProgress
 
@@ -192,6 +196,10 @@ internal object FirstPersonRenderGunEvent {
             return
         }
 
+        // 方案 B：GUI（背包/装配件/任意界面）打开时枪照常渲染，不再整体取消。
+        // 屏幕不乱晃由 renderPreparedFirstPersonModel 的 guiOpen 分支（xBob/yBob 归零）保证，
+        // 状态机照常驱动避免卡 T-pose（见 prepareFirstPersonRenderContext）。
+        // 这样按 Z 装配件等界面枪仍可见（修复 0.6.3"开界面枪消失"的副作用）。
         val prepared = prepareFirstPersonRenderContext(event.partialTicks) ?: return
         lastRenderedModel = prepared.model
         renderPreparedFirstPersonModel(prepared, bloomOnly = false, inlineBloom = true)
@@ -446,6 +454,8 @@ internal object FirstPersonRenderGunEvent {
             } else if (!sm.isInitialized && sm.exitingTime >= now) {
                 logFocusedSmokeExitingFirstPersonUpdate(gunId, sm.exitingTime - now)
             }
+            // GUI 打开时也正常驱动状态机：冻结 update 会让状态机卡在 T-pose"法国姿势"，
+            // 且画面抖动由渲染端的 guiOpen 分支（xBob/yBob 归零）抑制，这里不再整体停更。
             sm.update()
         }
 
@@ -482,8 +492,9 @@ internal object FirstPersonRenderGunEvent {
         val partialTicks = prepared.partialTicks
 
         GlStateManager.pushMatrix()
-        val xBob = player.prevRenderArmPitch + (player.renderArmPitch - player.prevRenderArmPitch) * partialTicks
-        val yBob = player.prevRenderArmYaw + (player.renderArmYaw - player.prevRenderArmYaw) * partialTicks
+        val guiOpen = isGuiOpen()
+        val xBob = if (guiOpen) 0f else player.prevRenderArmPitch + (player.renderArmPitch - player.prevRenderArmPitch) * partialTicks
+        val yBob = if (guiOpen) 0f else player.prevRenderArmYaw + (player.renderArmYaw - player.prevRenderArmYaw) * partialTicks
         val xRot = player.prevRotationPitch + (player.rotationPitch - player.prevRotationPitch) * partialTicks - xBob
         val yRot = player.prevRotationYaw + (player.rotationYaw - player.prevRotationYaw) * partialTicks - yBob
 
@@ -823,6 +834,11 @@ internal object FirstPersonRenderGunEvent {
     @SubscribeEvent
     @JvmStatic
     internal fun onCameraSetup(event: EntityViewRenderEvent.CameraSetup) {
+        // While a GUI (e.g. inventory) is open the walk-loop camera sway must not keep
+        // animating the world camera — otherwise the view visibly shakes behind the screen.
+        if (isGuiOpen()) {
+            return
+        }
         val player = Minecraft.getMinecraft().player ?: return
         val stack = player.heldItemMainhand
         if (stack.item !is IGun) return

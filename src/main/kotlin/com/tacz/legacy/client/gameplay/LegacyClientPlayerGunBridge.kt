@@ -154,9 +154,8 @@ internal object LegacyClientPlayerGunBridge {
         while (LegacyKeyBindings.RELOAD.isPressed) {
             val stack = player.heldItemMainhand
             val iGun = stack.item as? IGun ?: continue
-            if (iGun.useInventoryAmmo(stack)) {
-                continue
-            }
+            // 移除 useInventoryAmmo 拦截：背包供弹（inventory/fuel）的枪按 R 也能正常触发换弹，
+            // 否则这类枪换弹被直接跳过（bug2"换弹几乎失效"）。
             val before = operator.getSynReloadState().stateType
             operator.reload()
             if (before != operator.getSynReloadState().stateType) {
@@ -386,9 +385,7 @@ internal object LegacyClientPlayerGunBridge {
         }
         val stack = player.heldItemMainhand
         val iGun = stack.item as? IGun ?: return
-        if (iGun.useInventoryAmmo(stack)) {
-            return
-        }
+        // 移除 useInventoryAmmo 拦截：自动换弹对背包供弹（inventory/fuel）的枪同样生效。
         val gunData = GunDataAccessor.getGunData(iGun.getGunId(stack)) ?: return
         val ammoCount = LegacyRuntimeTooltipSupport.getCurrentAmmoWithBarrel(stack, iGun, gunData)
         if (ammoCount > 0) {

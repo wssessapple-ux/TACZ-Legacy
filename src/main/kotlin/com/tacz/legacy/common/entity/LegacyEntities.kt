@@ -198,7 +198,9 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
             this.explosionDamage = exp.damage
             this.explosionKnockback = exp.knockback
             this.explosionDestroyBlock = exp.destroyBlock
-            this.explosionDelay = if (exp.delay < 0.0f) Float.POSITIVE_INFINITY else exp.delay
+            // delay <= 0：contact 弹（命中即爆），不设倒计时，只等 onImpact 命中才引爆；
+            // delay > 0：真正延迟弹（如榴弹），飞行倒计时爆炸。
+            this.explosionDelay = if (exp.delay <= 0.0f) Float.POSITIVE_INFINITY else exp.delay
         }
     }
 
@@ -596,6 +598,38 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         // no-op: client computes motion locally
     }
 
+    /**
+     * 服务端射线检测：只被完整方块（full block）阻挡，穿透不完整方块
+     * （草丛、半砖、栅栏、雪层等）。避免这些非完整方块挡住高速子弹/爆炸。
+     * 对齐上游"子弹只被实心方块阻挡"的预期。
+     */
+    private fun rayTraceBlockIgnorePartial(startVec: Vec3d, endVec: Vec3d): RayTraceResult? {
+        var scanStart = startVec
+        val scanEnd = endVec
+        val dx = motionX
+        val dy = motionY
+        val dz = motionZ
+        var iteration = 0
+        while (iteration < 64) {
+            val result = world.rayTraceBlocks(scanStart, scanEnd, false, false, false)
+            if (result == null || result.typeOfHit != RayTraceResult.Type.BLOCK) {
+                return null
+            }
+            val state = world.getBlockState(result.blockPos)
+            if (state.isFullBlock()) {
+                return result
+            }
+            // 不完整方块：从命中点沿运动方向微推，跳过并继续向前扫描
+            scanStart = Vec3d(
+                result.hitVec.x + dx * 0.001,
+                result.hitVec.y + dy * 0.001,
+                result.hitVec.z + dz * 0.001,
+            )
+            iteration++
+        }
+        return null
+    }
+
     override fun onUpdate() {
         // 完全绕过 EntityThrowable.onUpdate() 的碰撞检测、0.99f 拖拽与 0.2 旋转插值。
         // 与上游 TACZ EntityKineticBullet.tick() + onBulletTick() 逻辑对齐。
@@ -619,8 +653,8 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
             val startVec = Vec3d(posX, posY, posZ)
             var endVec = Vec3d(posX + motionX, posY + motionY, posZ + motionZ)
 
-            // 方块碰撞
-            val blockResult = world.rayTraceBlocks(startVec, endVec)
+            // 方块碰撞（仅完整方块阻挡，穿透不完整方块）
+            val blockResult = rayTraceBlockIgnorePartial(startVec, endVec)
             if (blockResult != null && blockResult.typeOfHit == RayTraceResult.Type.BLOCK) {
                 endVec = blockResult.hitVec
             }
@@ -711,6 +745,10 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
 
     private fun applyDirectHitDamage(target: Entity, hitPosition: Vec3d, headShot: Boolean): HitFeedbackResult {
         val totalDamage = resolveEffectiveDamageAt(hitPosition)
+        TACZLegacy.logger.info(
+            "[KnockbackTrace] BULLET direct hit {} dmg={} headshot={} (no-knockback per upstream alignment)",
+            target.name, totalDamage, headShot,
+        )
         if (totalDamage <= 0.0f) {
             return HitFeedbackResult(false, 0.0f, 1.0f, headShot)
         }

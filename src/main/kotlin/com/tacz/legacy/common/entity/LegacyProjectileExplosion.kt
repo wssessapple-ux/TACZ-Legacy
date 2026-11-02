@@ -1,6 +1,7 @@
 package com.tacz.legacy.common.entity
 
 import com.google.common.collect.Sets
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.common.config.LegacyConfigManager
 import net.minecraft.block.material.Material
 import net.minecraft.block.state.IBlockState
@@ -14,6 +15,7 @@ import net.minecraft.util.DamageSource
 import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.MathHelper
+import net.minecraft.util.math.RayTraceResult
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.Explosion
 import net.minecraft.world.WorldServer
@@ -37,6 +39,10 @@ internal object LegacyProjectileExplosionHelper {
         val actualDamage = damage.coerceAtLeast(0.0f)
         val damagesTerrain = destroyBlock && LegacyConfigManager.common.explosiveAmmoDestroysBlock
         val allowKnockback = knockback && LegacyConfigManager.common.explosiveAmmoKnockBack
+        TACZLegacy.logger.info(
+            "[KnockbackTrace] EXPLOSION created allowKnockback={} (nbtKnockback={}, cfgExplosiveAmmoKnockBack={}) radius={} dmg={} at {},{},{}",
+            allowKnockback, knockback, LegacyConfigManager.common.explosiveAmmoKnockBack, actualRadius, actualDamage, x, y, z,
+        )
         val explosion = LegacyProjectileExplosion(
             world = worldServer,
             owner = owner,
@@ -117,13 +123,18 @@ internal class LegacyProjectileExplosion(
             if (entity.isImmuneToExplosions) {
                 continue
             }
-            val distanceRatio = if (doubledRadius <= 0.0f) {
-                0.0
-            } else {
-                entity.getDistance(centerX, centerY, centerZ) / doubledRadius.toDouble()
-            }
-            if (distanceRatio > 1.0) {
+            // 官方 TACZ 语义：取生物 15 个角点/面中心里"最暴露"（未被完整方块挡）的
+            // 直达距离算伤害；生物只要有一个方向暴露就能造成伤害（对齐科技枪穿透手感），
+            // 全部被完整方块包住时 strength>1 → 无伤，保持"隔墙不炸穿"。
+            val minDist = computeMinExposedDistance(center, entity.entityBoundingBox)
+            val strength = if (radius <= 0.0f) 2.0 else minDist / radius.toDouble()
+            if (strength > 1.0) {
                 continue
+            }
+            val impact = (1.0 - strength).coerceAtLeast(0.0)
+            val damageAmount = (impact * damagePower).toFloat().coerceAtLeast(0.0f)
+            if (damageAmount > 0.0f) {
+                entity.attackEntityFrom(DamageSource.causeExplosionDamage(this), damageAmount)
             }
 
             val dx = entity.posX - centerX
@@ -132,16 +143,6 @@ internal class LegacyProjectileExplosion(
             val length = sqrt(dx * dx + dy * dy + dz * dz)
             if (length == 0.0) {
                 continue
-            }
-            val exposure = world.getBlockDensity(center, entity.entityBoundingBox)
-            val impact = (1.0 - distanceRatio) * exposure
-            if (impact <= 0.0) {
-                continue
-            }
-
-            val damageAmount = (impact * damagePower).toFloat().coerceAtLeast(0.0f)
-            if (damageAmount > 0.0f) {
-                entity.attackEntityFrom(DamageSource.causeExplosionDamage(this), damageAmount)
             }
 
             if (!applyKnockback || knockbackScale <= 0.0) {
@@ -155,6 +156,15 @@ internal class LegacyProjectileExplosion(
             if (entity is EntityLivingBase) {
                 knockbackAmount = EnchantmentProtection.getBlastDamageReduction(entity, impact)
             }
+            TACZLegacy.logger.info(
+                "[KnockbackTrace] EXPLOSION applyKnockback to {} motion+=({}, {}, {}) scale={} cfg={}",
+                entity.name,
+                normX * knockbackAmount * knockbackScale,
+                normY * knockbackAmount * knockbackScale,
+                normZ * knockbackAmount * knockbackScale,
+                knockbackScale,
+                LegacyConfigManager.common.explosiveAmmoKnockBack,
+            )
             entity.motionX += normX * knockbackAmount * knockbackScale
             entity.motionY += normY * knockbackAmount * knockbackScale
             entity.motionZ += normZ * knockbackAmount * knockbackScale
@@ -164,6 +174,70 @@ internal class LegacyProjectileExplosion(
                 getPlayerKnockbackMap()[entity] = Vec3d(normX * impact * knockbackScale, normY * impact * knockbackScale, normZ * impact * knockbackScale)
             }
         }
+    }
+
+    /**
+     * 官方 TACZ 语义：从爆炸中心向生物 AABB 的 15 个角点/面中心发射线，
+     * 取"最近一个未被完整方块阻挡（穿透不完整方块）"的直达距离算伤害。
+     * 生物只要有一个方向暴露即可按该方向造成伤害（对齐科技枪穿透手感）；
+     * 全部方向被完整方块挡住时返回半径（strength>1 → 无伤），保持隔墙不炸穿。
+     */
+    private fun computeMinExposedDistance(center: Vec3d, bb: AxisAlignedBB): Double {
+        val cx = (bb.minX + bb.maxX) * 0.5
+        val cy = (bb.minY + bb.maxY) * 0.5
+        val cz = (bb.minZ + bb.maxZ) * 0.5
+        val points = arrayOf(
+            Vec3d(bb.minX, bb.minY, bb.minZ), Vec3d(bb.minX, bb.minY, bb.maxZ),
+            Vec3d(bb.minX, bb.maxY, bb.minZ), Vec3d(bb.maxX, bb.minY, bb.minZ),
+            Vec3d(bb.minX, bb.maxY, bb.maxZ), Vec3d(bb.maxX, bb.minY, bb.maxZ),
+            Vec3d(bb.maxX, bb.maxY, bb.minZ), Vec3d(bb.maxX, bb.maxY, bb.maxZ),
+            Vec3d(bb.minX, cy, cz), Vec3d(bb.maxX, cy, cz),
+            Vec3d(cx, bb.minY, cz), Vec3d(cx, bb.maxY, cz),
+            Vec3d(cx, cy, bb.minZ), Vec3d(cx, cy, bb.maxZ),
+            Vec3d(cx, cy, cz),
+        )
+        var minDist = radius.toDouble()
+        for (p in points) {
+            // 爆炸中心 → 该角点：未被完整方块挡 = 直达
+            if (rayTraceIgnorePartial(center, p) == null) {
+                val d = center.distanceTo(p)
+                if (d < minDist) minDist = d
+            }
+        }
+        return minDist
+    }
+
+    /**
+     * 只被完整方块阻挡的射线检测，穿透不完整方块（草/雪/半砖/栅栏/花）。
+     */
+    private fun rayTraceIgnorePartial(from: Vec3d, to: Vec3d): RayTraceResult? {
+        var scanStart = from
+        val dx = to.x - from.x
+        val dy = to.y - from.y
+        val dz = to.z - from.z
+        val length = sqrt(dx * dx + dy * dy + dz * dz)
+        val ux = if (length > 1.0E-6) dx / length else 0.0
+        val uy = if (length > 1.0E-6) dy / length else 0.0
+        val uz = if (length > 1.0E-6) dz / length else 0.0
+        var iteration = 0
+        while (iteration < 64) {
+            val result = world.rayTraceBlocks(scanStart, to, false, false, false)
+            if (result == null || result.typeOfHit != RayTraceResult.Type.BLOCK) {
+                return null
+            }
+            val state = world.getBlockState(result.blockPos)
+            if (state.isFullBlock()) {
+                return result
+            }
+            // 不完整方块：沿方向微推跳过，继续扫描
+            scanStart = Vec3d(
+                result.hitVec.x + ux * 0.001,
+                result.hitVec.y + uy * 0.001,
+                result.hitVec.z + uz * 0.001,
+            )
+            iteration++
+        }
+        return null
     }
 
     private fun collectAffectedBlocks() {

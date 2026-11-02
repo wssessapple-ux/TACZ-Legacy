@@ -20,7 +20,7 @@
     "explosion": {
       "explode": true,
       "damage": 120,
-      "radius": 3,
+      "radius": 5,
       "knockback": true,
       "destroy_block": true,
       "delay": 30
