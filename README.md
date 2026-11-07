@@ -188,9 +188,9 @@
 
 ---
 
-### 🔌 前置模组依赖（缺失将导致游戏崩溃）
+### 🔌 前置与可选依赖（强制项缺失将导致游戏崩溃）
 
-本模组依赖以下两个前置模组，已随本发布版一同提供：
+**强制前置共 2 个**（缺失会崩，已随本发布版一同提供）；下面第 3、4 项为推荐 / 可选增强，缺了照样能玩。
 
 **1. MixinBooter**
 - **作者**：Rongmario（及 CleanroomMC 团队维护）
@@ -206,7 +206,21 @@
 - **作者**:mezz
 - **作用**：在游戏内直接查看所有枪械、弹药及工作台的合成配方。
 - **版本**:JEI 4.16.x 全系列 兼容
+
+**4. PlayerAnimator 1.12.2 移植版 - 可选增强（不装也能玩）**
+- **作者**：**zsjs110110-cpu**（B站「真·转瞬即逝」）
+- **作用**：提供**第三人称玩家动作动画**。装了才有动画；不装照旧（枪仍是静态持握），**不会崩溃**，因此不在强制前置列表里。
+- **版本**：1.0.2-rc1（要求 Forge 14.23.5.2859+、Java 8、MixinBooter 10.7+）
+- **仓库**：[zsjs110110-cpu/playeranimator-1.12.2](https://github.com/zsjs110110-cpu/playeranimator-1.12.2)（MIT，上游 KosmX `minecraftPlayerAnimator` `1.0.2-rc1`）
   
+---
+
+### 🙏 致谢与参考来源
+
+- **第三人称动作动画**：底层动画系统来自 **zsjs110110-cpu** 的 [playeranimator-1.12.2](https://github.com/zsjs110110-cpu/playeranimator-1.12.2) 移植版（MIT，上游 KosmX `minecraftPlayerAnimator` `1.0.2-rc1`）。本仓库只做**数据接入**——读取枪包自带的 `*.player_animation.json`，按枪械状态挑选 clip 喂给它；**没有修改、也没有内嵌他的代码**（编译期 `compileOnly` 引用，发布包内不含其类文件）。
+- **Lua 沙箱安全加固**：`os` / `io` / `luajava` / `load` 等高危入口的移除方案（`secureStandardGlobals`），是**参考 zsjs110110-cpu 的源码后自行实现**的，不是照搬其代码。
+- **原始移植**：Kasumi_Nova (Hikari_Nova)，授权与声明见上方「非官方移植构建版重要声明」。
+
 ---
 
 ### 🚧 项目边界说明
