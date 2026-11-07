@@ -1,0 +1,38 @@
+{
+  "materials": [
+    {
+      "item": {
+        "item": "minecraft:iron_ingot"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:redstone"
+      },
+      "count": 1
+    },
+    {
+      "item": {
+        "item": "minecraft:gunpowder"
+      },
+      "count": 1
+    },
+    {
+      "item": {
+        "item": "tacz:ammo",
+        "nbt": {
+          "AmmoId": "tacz:9mm"
+        }
+      },
+      "count": 2
+    }
+  ],
+  "result": {
+    "type": "custom",
+    "item": {
+      "item": "tacz:drone_civilian"
+    }
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

@@ -594,10 +594,15 @@ addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6,
             val row = index / 2
             val x = guiLeft + 254 + 45 * column
             val y = guiTop + 62 + 17 * row
-            val matchingStacks = ingredient.ingredient.matchingStacks
-            if (matchingStacks.isNotEmpty()) {
-                val stack = matchingStacks[(System.currentTimeMillis() / 1_000L % matchingStacks.size.toLong()).toInt()].copy()
-                itemRender.renderItemAndEffectIntoGUI(stack, x, y)
+            val previewStack = ingredient.previewStack
+            if (previewStack != null) {
+                itemRender.renderItemAndEffectIntoGUI(previewStack, x, y)
+            } else {
+                val matchingStacks = ingredient.ingredient.matchingStacks
+                if (matchingStacks.isNotEmpty()) {
+                    val stack = matchingStacks[(System.currentTimeMillis() / 1_000L % matchingStacks.size.toLong()).toInt()].copy()
+                    itemRender.renderItemAndEffectIntoGUI(stack, x, y)
+                }
             }
             val need = ingredient.count
             val has = ingredientCounts[index] ?: 0
@@ -635,11 +640,13 @@ addButton(TexturedButton(BUTTON_RESULT_NEXT, guiLeft + 143, guiTop + 171, 96, 6,
             val x = guiLeft + 254 + 45 * column
             val y = guiTop + 62 + 17 * row
             if (mouseX in x until (x + 16) && mouseY in y until (y + 16)) {
+                val previewStack = ingredient.previewStack
                 val stacks = ingredient.ingredient.matchingStacks
-                if (stacks.isNotEmpty()) {
+                val displayStack = previewStack ?: stacks.firstOrNull()
+                if (displayStack != null) {
                     val tooltipFlag = if (mc.gameSettings.advancedItemTooltips) ITooltipFlag.TooltipFlags.ADVANCED else ITooltipFlag.TooltipFlags.NORMAL
-                    val tooltipLines = stacks.first().getTooltip(mc.player, tooltipFlag)
-                    TACZAsciiFontHelper.runWithTemporaryUnicodeFlagDisabled(fontRenderer, tooltipLines, Runnable { renderToolTip(stacks.first(), mouseX, mouseY) })
+                    val tooltipLines = displayStack.getTooltip(mc.player, tooltipFlag)
+                    TACZAsciiFontHelper.runWithTemporaryUnicodeFlagDisabled(fontRenderer, tooltipLines, Runnable { renderToolTip(displayStack, mouseX, mouseY) })
                 } else {
                     val lines = listOf(I18n.format("gui.tacz.gun_smith_table.missing_ingredient"))
                     TACZAsciiFontHelper.runWithTemporaryUnicodeFlagDisabled(fontRenderer, lines, Runnable { drawHoveringText(lines, mouseX, mouseY) })

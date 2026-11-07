@@ -14,6 +14,7 @@ import com.tacz.legacy.client.gui.GunSmithTableScreen
 import com.tacz.legacy.client.input.LegacyKeyBindings
 import com.tacz.legacy.client.renderer.block.GunSmithTableTileEntityRenderer
 import com.tacz.legacy.client.renderer.bloom.TACZBloomBridge
+import com.tacz.legacy.client.renderer.entity.RenderDrone
 import com.tacz.legacy.client.renderer.entity.RenderKineticBullet
 import com.tacz.legacy.client.renderer.item.TACZAmmoItemRenderer
 import com.tacz.legacy.client.renderer.item.TACZAttachmentItemRenderer
@@ -27,6 +28,7 @@ import com.tacz.legacy.common.foundation.BootstrapStep
 import com.tacz.legacy.common.gui.LegacyGuiIds
 import com.tacz.legacy.common.inventory.AmmoBoxContainer
 import com.tacz.legacy.common.inventory.GunSmithTableContainer
+import com.tacz.legacy.common.entity.EntityDrone
 import com.tacz.legacy.common.entity.EntityKineticBullet
 import com.tacz.legacy.common.item.LegacyItems
 import com.tacz.legacy.client.particle.LegacyParticleFactoryRegistry
@@ -62,6 +64,10 @@ internal class ClientProxy : CommonProxy() {
         RenderingRegistry.registerEntityRenderingHandler(
             EntityKineticBullet::class.java,
             IRenderFactory { manager -> RenderKineticBullet(manager) },
+        )
+        RenderingRegistry.registerEntityRenderingHandler(
+            EntityDrone::class.java,
+            IRenderFactory { manager -> RenderDrone(manager) },
         )
     }
 

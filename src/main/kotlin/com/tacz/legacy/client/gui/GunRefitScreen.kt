@@ -63,7 +63,6 @@ internal class GunRefitScreen : GuiScreen() {
 
 	private val slotButtons: MutableList<AttachmentSlotButton> = mutableListOf()
 	private val inventoryButtons: MutableList<InventoryAttachmentButton> = mutableListOf()
-	private var unloadButton: UnloadButton? = null
 	private var pageUpButton: TurnPageButton? = null
 	private var pageDownButton: TurnPageButton? = null
 	private var hueSlider: ColorSliderButton? = null
@@ -81,7 +80,6 @@ internal class GunRefitScreen : GuiScreen() {
 		buttonList.clear()
 		slotButtons.clear()
 		inventoryButtons.clear()
-		unloadButton = null
 		pageUpButton = null
 		pageDownButton = null
 		hueSlider = null
@@ -188,7 +186,10 @@ internal class GunRefitScreen : GuiScreen() {
 				initGui()
 			}
 
-			BUTTON_UNLOAD -> tryUnloadSelectedAttachment()
+			in BUTTON_UNLOAD_BASE until BUTTON_UNLOAD_BASE + AttachmentType.values().size -> {
+				val type = AttachmentType.values()[button.id - BUTTON_UNLOAD_BASE]
+				tryUnloadType(type)
+			}
 			else -> {
 				slotButtons.firstOrNull { it.id == button.id }?.let { slotButton ->
 					if (!slotButton.isAllowed()) {
@@ -560,10 +561,17 @@ internal class GunRefitScreen : GuiScreen() {
 		}
 
 		val iGun = currentIGun() ?: return
-		val installed = iGun.getAttachment(currentGunStack(), selectedType)
-		if (!installed.isEmpty) {
-			slotButtons.firstOrNull { it.type == selectedType }?.let { slotButton ->
-				unloadButton = addButton(UnloadButton(BUTTON_UNLOAD, slotButton.x + 5, slotButton.y + SLOT_SIZE + 2))
+		// [0.6.4-REV] 每个"已装配件"的槽位都放卸载 X 按钮（不再只针对 selectedType 单点）：
+		// 之前仅在 selectedType 对应槽装了配件时才创建一个，QA 打开界面默认总览态(NONE)根本看不到卸载 X。
+		slotButtons.forEach { slotButton ->
+			if (slotButton.isAllowed() && !iGun.getAttachment(currentGunStack(), slotButton.type).isEmpty) {
+				addButton(
+					UnloadButton(
+						BUTTON_UNLOAD_BASE + slotButton.type.ordinal,
+						slotButton.x + 5,
+						slotButton.y + SLOT_SIZE + 2,
+					),
+				)
 			}
 		}
 
@@ -858,11 +866,11 @@ internal class GunRefitScreen : GuiScreen() {
 		return ((total - 1).coerceAtLeast(0)) / CANDIDATES_PER_PAGE
 	}
 
-	private fun tryUnloadSelectedAttachment() {
+	private fun tryUnloadType(type: AttachmentType) {
 		val player = currentPlayer() ?: return
 		val gunStack = currentGunStack()
 		val iGun = currentIGun() ?: return
-		val attachment = iGun.getAttachment(gunStack, selectedType)
+		val attachment = iGun.getAttachment(gunStack, type)
 		if (attachment.isEmpty) {
 			return
 		}
@@ -870,7 +878,7 @@ internal class GunRefitScreen : GuiScreen() {
 			player.sendMessage(TextComponentTranslation("gui.tacz.gun_refit.unload.no_space"))
 			return
 		}
-		TACZNetworkHandler.sendToServer(ClientMessageUnloadAttachment(player.inventory.currentItem, selectedType))
+		TACZNetworkHandler.sendToServer(ClientMessageUnloadAttachment(player.inventory.currentItem, type))
 	}
 
 	private fun currentLaserConfig(): TACZAttachmentLaserConfigDefinition? {
@@ -1519,6 +1527,8 @@ internal class GunRefitScreen : GuiScreen() {
 		private const val BUTTON_PAGE_UP: Int = 4
 		private const val BUTTON_PAGE_DOWN: Int = 5
 		private const val BUTTON_UNLOAD: Int = 6
+		// [0.6.4-REV] 卸载 X 按钮改为每个"已装配件"槽一个，id 按类型偏移
+		private const val BUTTON_UNLOAD_BASE: Int = 3000
 		private const val BUTTON_HUE_SLIDER: Int = 7
 		private const val BUTTON_SATURATION_SLIDER: Int = 8
 		private const val BUTTON_SLOT_BASE: Int = 1000

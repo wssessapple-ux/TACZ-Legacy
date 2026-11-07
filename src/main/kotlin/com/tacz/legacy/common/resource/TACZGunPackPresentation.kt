@@ -346,8 +346,15 @@ internal object TACZGunPackPresentation {
 private fun JsonObject.jsonObject(key: String): JsonObject? =
     get(key)?.takeIf { it.isJsonObject }?.asJsonObject
 
-private fun JsonObject.stringValue(key: String): String? =
-    get(key)?.takeIf { !it.isJsonNull }?.asString?.trim()?.takeIf(String::isNotBlank)
+private fun JsonObject.stringValue(key: String): String? {
+    val element = get(key) ?: return null
+    if (element.isJsonNull) return null
+    return when {
+        element.isJsonPrimitive -> element.asString.trim().takeIf(String::isNotBlank)
+        element.isJsonObject -> element.asJsonObject.stringValue("id")
+        else -> null
+    }
+}
 
 private fun JsonObject.floatValue(key: String): Float? =
     get(key)?.takeIf { !it.isJsonNull }?.asFloat

@@ -1,5 +1,6 @@
 ﻿package com.tacz.legacy.client.gameplay
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.IGunOperator
 import com.tacz.legacy.api.entity.ShootResult
 import com.tacz.legacy.api.event.GunFireEvent
@@ -84,6 +85,14 @@ internal object LegacyClientShootCoordinator {
         val player = Minecraft.getMinecraft().player ?: return
         val stack = player.heldItemMainhand
         val iGun = stack.item as? IGun
+        val localAmmoBefore = iGun?.getCurrentAmmoCount(stack) ?: -1
+        val localBarrelBefore = iGun?.hasBulletInBarrel(stack) ?: false
+        val useInvAmmo = iGun?.useInventoryAmmo(stack) ?: false
+        TACZLegacy.logger.info(
+            "[AmmoSync] CLIENT_APPLY result={} serverGunId={} serverAmmo={} localGunId={} localAmmoBefore={} barrel={} useInvAmmo={}",
+            result, gunId, ammoCount,
+            iGun?.getGunId(stack)?.toString(), localAmmoBefore, localBarrelBefore, useInvAmmo,
+        )
         if (iGun != null && (gunId == null || iGun.getGunId(stack).toString() == gunId)) {
             // NETWORK_FAIL（时间戳抖动/卡顿）时保留客户端预测扣弹，不回滚弹药，
             // 避免重型整合包低 TPS 下"扣了又回"的观感抖动；其余拒绝仍以服务端权威回滚。

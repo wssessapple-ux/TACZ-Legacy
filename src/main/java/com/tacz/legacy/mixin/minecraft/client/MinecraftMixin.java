@@ -31,6 +31,15 @@ public abstract class MinecraftMixin {
         ci.cancel();
     }
 
+    // [0.6.4-REV] 持枪右键拦截：原版 rightClickMouse 会触发 use/放方块/用物品，持枪时右键应归 TACZ 瞄准
+    // (AIM 键绑定，不经过 rightClickMouse)。QA 反馈'拿着枪右键能使用 Minecraft 基础键位功能'，补齐此拦截。
+    @Inject(method = "rightClickMouse", at = @At("HEAD"), cancellable = true)
+    private void tacz$cancelGunRightClickMouse(CallbackInfo ci) {
+        if (tacz$shouldSuppressGunLeftClick()) {
+            ci.cancel();
+        }
+    }
+
     @Unique
     private boolean tacz$shouldSuppressGunLeftClick() {
         Minecraft minecraft = (Minecraft) (Object) this;

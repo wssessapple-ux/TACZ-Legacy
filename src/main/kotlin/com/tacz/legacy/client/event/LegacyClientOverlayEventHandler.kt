@@ -22,6 +22,7 @@ import net.minecraft.client.gui.Gui
 import net.minecraft.client.gui.ScaledResolution
 import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.entity.EntityList
+import net.minecraft.item.ItemStack
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.RayTraceResult
@@ -89,6 +90,7 @@ internal object LegacyClientOverlayEventHandler {
         renderGunHud(event)
         renderKillAmountOverlay(event)
         renderInteractPrompt(event)
+        renderDroneLockHud(event)
     }
 
     private fun renderHitMarker(mc: Minecraft) {
@@ -443,6 +445,43 @@ internal object LegacyClientOverlayEventHandler {
             (height / 2f - 25f),
             TextFormatting.YELLOW.colorIndex?.let { 0xFFFF55 } ?: 0xFFFF55,
         )
+    }
+
+    private fun renderDroneLockHud(event: RenderGameOverlayEvent.Post) {
+        val mc = Minecraft.getMinecraft()
+        if (mc.gameSettings.hideGUI) {
+            return
+        }
+        val player = mc.player ?: return
+        if (player.isSpectator) {
+            return
+        }
+
+        // 检查主手和副手是否持有锁定状态的无人机
+        var lockedStack: ItemStack? = null
+        for (hand in net.minecraft.util.EnumHand.values()) {
+            val held = player.getHeldItem(hand)
+            if (held.item is com.tacz.legacy.common.item.DroneItem) {
+                lockedStack = held
+                break
+            }
+        }
+        val stack = lockedStack ?: return
+        val tag = stack.tagCompound ?: return
+        if (!tag.hasKey("TargetId")) {
+            return
+        }
+        val targetId = tag.getInteger("TargetId")
+        val target = player.world.getEntityByID(targetId)
+        val targetName = if (target != null && target.isEntityAlive) target.name else "???"
+
+        val text = "${TextFormatting.RED}已锁定：${TextFormatting.WHITE}$targetName"
+        val font = mc.fontRenderer
+        val width = event.resolution.scaledWidth
+        val x = (width - font.getStringWidth(text)) / 2
+        val y = 8
+
+        TACZAsciiFontHelper.drawStringWithShadow(font, text, x.toFloat(), y.toFloat(), 0xFFFF5555.toInt())
     }
 
     private fun prettyKeyName(keyName: String): String {

@@ -307,3 +307,7 @@ tooltip.tacz.page.next=Next
 tooltip.tacz.page.previous=Previous
 tooltip.tacz.refit.unload=Unload
 hud.tacz.heat.overheat=OVERHEAT!
+
+item.tacz.drone_civilian.name=Civilian Drone
+item.tacz.drone_military.name=Military Drone
+entity.tacz.drone.name=Drone

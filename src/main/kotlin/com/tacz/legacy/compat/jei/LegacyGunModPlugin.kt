@@ -9,7 +9,6 @@ import mezz.jei.api.IModRegistry
 import mezz.jei.api.ISubtypeRegistry
 import mezz.jei.api.JEIPlugin
 import net.minecraft.item.ItemStack
-import net.minecraft.item.crafting.Ingredient
 import net.minecraft.util.ResourceLocation
 
 /**
@@ -70,7 +69,9 @@ public class LegacyGunModPlugin : IModPlugin {
             val title = icon.displayName
             registry.addRecipeCategories(LegacyGunSmithTableCategory(guiHelper, uid, title, icon))
             registry.addRecipes(recipes.map { LegacyGunSmithTableWrapper(it) }, uid.toString())
-            registry.addRecipeCatalyst(Ingredient.fromStacks(icon), uid.toString())
+            // JEI 4.x 的 addRecipeCatalyst 直接接受 ItemStack；
+            // 包成原版 Ingredient 会被判定为未知 ingredient 而抛异常
+            registry.addRecipeCatalyst(icon, uid.toString())
         }
     }
 }

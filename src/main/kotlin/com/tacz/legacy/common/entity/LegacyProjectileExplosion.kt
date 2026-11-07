@@ -128,13 +128,47 @@ internal class LegacyProjectileExplosion(
             // 全部被完整方块包住时 strength>1 → 无伤，保持"隔墙不炸穿"。
             val minDist = computeMinExposedDistance(center, entity.entityBoundingBox)
             val strength = if (radius <= 0.0f) 2.0 else minDist / radius.toDouble()
+            // [0.6.4-REV] AOE 方向诊断日志：记录每只怪相对爆炸中心的偏移(dx,dz)与遮挡判定，
+            // 用于定位"正方向(+X 东 / +Z 南)其他怪不受伤"的方向性异常。
+            val offX = entity.posX - centerX
+            val offZ = entity.posZ - centerZ
+            TACZLegacy.logger.info(
+                "[AoeTrace] {} posX={} posZ={} off=({}, {}) minDist={} radius={} strength={} blocked={}",
+                entity.name,
+                "%.1f".format(entity.posX), "%.1f".format(entity.posZ),
+                "%.2f".format(offX), "%.2f".format(offZ),
+                "%.2f".format(minDist),
+                radius,
+                "%.2f".format(strength),
+                strength > 1.0,
+            )
             if (strength > 1.0) {
                 continue
             }
             val impact = (1.0 - strength).coerceAtLeast(0.0)
             val damageAmount = (impact * damagePower).toFloat().coerceAtLeast(0.0f)
             if (damageAmount > 0.0f) {
-                entity.attackEntityFrom(DamageSource.causeExplosionDamage(this), damageAmount)
+                // [0.6.4-REV] 伤害施加诊断：区分 attackEntityFrom 返回 false 的具体原因。
+                // applied=false 时只有几种可能：isEntityInvulnerable / 已死 / world.isRemote / ForgeHooks 取消 / 无敌帧半血递减。
+                // 日志额外带出 immune/dead/remote 三字段，定位到底是哪一层吞了伤害。
+                val damageSource = DamageSource.causeExplosionDamage(this)
+                val immune = entity.isEntityInvulnerable(damageSource)
+                val dead = entity.isDead
+                val remote = entity.world.isRemote
+                val applied = entity.attackEntityFrom(damageSource, damageAmount)
+                TACZLegacy.logger.info(
+                    "[AoeTraceDmg] {} off=({}, {}) strength={} dmg={} damagePower={} applied={} hurtResistant={} immune={} dead={} remote={}",
+                    entity.name,
+                    "%.2f".format(entity.posX - centerX), "%.2f".format(entity.posZ - centerZ),
+                    "%.2f".format(strength),
+                    "%.2f".format(damageAmount),
+                    damagePower,
+                    applied,
+                    if (entity is EntityLivingBase) entity.hurtResistantTime else -1,
+                    immune,
+                    dead,
+                    remote,
+                )
             }
 
             val dx = entity.posX - centerX
@@ -186,6 +220,13 @@ internal class LegacyProjectileExplosion(
         val cx = (bb.minX + bb.maxX) * 0.5
         val cy = (bb.minY + bb.maxY) * 0.5
         val cz = (bb.minZ + bb.maxZ) * 0.5
+        // [0.6.4-REV] 隔墙不炸穿：先扫一条"爆炸中心→怪物中心"的直达射线做前置判定。
+        // 若中心直达怪中心被完整方块(非中心格、非怪占位格)挡住，说明中间有完整墙/黑曜石墙，
+        // 直接判定隔墙无伤——防止怪 bbox 上部角点越墙顶导致整只怪被判定暴露
+        // (QA:"墙后面也死了""黑曜石也能波及到")。
+        if (rayTraceIgnorePartial(center, Vec3d(cx, cy, cz)) != null) {
+            return radius.toDouble()
+        }
         val points = arrayOf(
             Vec3d(bb.minX, bb.minY, bb.minZ), Vec3d(bb.minX, bb.minY, bb.maxZ),
             Vec3d(bb.minX, bb.maxY, bb.minZ), Vec3d(bb.maxX, bb.minY, bb.minZ),
@@ -212,6 +253,12 @@ internal class LegacyProjectileExplosion(
      */
     private fun rayTraceIgnorePartial(from: Vec3d, to: Vec3d): RayTraceResult? {
         var scanStart = from
+        // [0.6.4-REV] 爆炸中心自身所在方块不挡自己的射线：中心落进地面/雪堆等完整方块时，
+        // rayTraceBlocks(center, p) 第一步就命中它 → isFullBlock → 15 条角点射线全被挡 → AOE 全无伤。
+        val fromBlockPos = BlockPos(from.x, from.y, from.z)
+        // [0.6.4-REV] 终点(怪所在占位格)方块同样不挡：射线终点在怪 bbox 内，可能落在完整方块里，
+        // 若终点格也算遮挡会误伤"怪站在地面/墙边"的命中。
+        val toBlockPos = BlockPos(to.x, to.y, to.z)
         val dx = to.x - from.x
         val dy = to.y - from.y
         val dz = to.z - from.z
@@ -226,14 +273,15 @@ internal class LegacyProjectileExplosion(
                 return null
             }
             val state = world.getBlockState(result.blockPos)
-            if (state.isFullBlock()) {
+            // 完整方块墙且不是爆炸中心所在方块、也不是终点怪所在方块 → 遮挡（隔墙不炸穿）
+            if (state.isFullBlock() && result.blockPos != fromBlockPos && result.blockPos != toBlockPos) {
                 return result
             }
-            // 不完整方块：沿方向微推跳过，继续扫描
+            // 不完整方块或起点(中心)方块：沿方向微推跳过，继续扫描（步长 0.05 确保越出表面）
             scanStart = Vec3d(
-                result.hitVec.x + ux * 0.001,
-                result.hitVec.y + uy * 0.001,
-                result.hitVec.z + uz * 0.001,
+                result.hitVec.x + ux * 0.05,
+                result.hitVec.y + uy * 0.05,
+                result.hitVec.z + uz * 0.05,
             )
             iteration++
         }

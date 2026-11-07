@@ -204,6 +204,11 @@ public class GunAnimationStateContext extends ItemAnimationStateContext {
         return processCameraEntity(entity -> gunData != null && entity.isSneaking() && gunData.canSlide()).orElse(false);
     }
 
+    public boolean isCharging() {
+        // TODO: 现代 TACZ API 移植，目前返回 false 仅避免 Lua 脚本崩溃
+        return false;
+    }
+
     public void anchorWalkDist() {
         processCameraEntity(entity -> {
             walkDistAnchor = entity.distanceWalkedModified

@@ -127,6 +127,20 @@ internal object LegacyClientGunAnimationDriver {
         return true
     }
 
+    // [0.6.4-REV] 进入并保持某个循环状态（如跑步收枪 INPUT_RUN）直到 GUI 关闭，不 exit：
+    // 打开背包/GUI 时让状态机持续处于"跑步停下收枪"姿态（枪一直收着），
+    // 而不是播一次收枪动画后就 exit——exit 会在 exiting 结束后被渲染端重新 draw，导致枪又掏出来（QA 反馈"会切回"）。
+    internal fun enterLoopState(stack: ItemStack, input: String, partialTicks: Float = 0f): Boolean {
+        val display = resolveDisplayInstance(stack) ?: return false
+        val stateMachine = display.animationStateMachine ?: return false
+        if (!stateMachine.isInitialized) {
+            prepareContext(stateMachine, stack, display, partialTicks)
+            stateMachine.initialize()
+            stateMachine.trigger(GunAnimationConstant.INPUT_DRAW)
+        }
+        return trigger(stateMachine, input, stack, display, partialTicks)
+    }
+
     internal fun visualUpdateHeldGun(player: EntityPlayerSP, partialTicks: Float): Boolean {
         val stack = player.heldItemMainhand
         val display = resolveDisplayInstance(stack) ?: return false

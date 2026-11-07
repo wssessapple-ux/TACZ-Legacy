@@ -2,6 +2,7 @@ package com.tacz.legacy.common
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.common.block.entity.LegacyBlockEntities
+import com.tacz.legacy.common.event.ChunkUnloadHandler
 import com.tacz.legacy.common.event.LegacyMissingMappingHandler
 import com.tacz.legacy.common.event.PreventGunLeftClickHandler
 import com.tacz.legacy.common.foundation.FocusedSmokeRuntime
@@ -27,6 +28,7 @@ internal open class CommonProxy {
         MinecraftForge.EVENT_BUS.register(PreventGunLeftClickHandler)
         MinecraftForge.EVENT_BUS.register(ShooterTickHandler)
         MinecraftForge.EVENT_BUS.register(FocusedSmokeRuntime)
+        MinecraftForge.EVENT_BUS.register(ChunkUnloadHandler)
     }
 
     internal open fun preInit(): Unit {

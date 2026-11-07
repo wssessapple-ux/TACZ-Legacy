@@ -41,6 +41,7 @@ import java.util.Locale
 public data class LegacyGunSmithIngredient(
     val ingredient: Ingredient,
     val count: Int,
+    val previewStack: ItemStack? = null,
 )
 
 public data class LegacyGunSmithRecipe(
@@ -233,7 +234,20 @@ internal object LegacyGunSmithingRuntime {
         val itemElement = obj.get("item") ?: return null
         val ingredient = parseIngredient(itemElement, context)
         val count = JsonUtils.getInt(obj, "count", 1).coerceAtLeast(1)
-        return LegacyGunSmithIngredient(ingredient = ingredient, count = count)
+        val previewStack = parsePreviewStack(itemElement)
+        return LegacyGunSmithIngredient(ingredient = ingredient, count = count, previewStack = previewStack)
+    }
+
+    private fun parsePreviewStack(itemElement: JsonElement): ItemStack? {
+        if (!itemElement.isJsonObject) return null
+        val obj = itemElement.asJsonObject
+        if (!obj.has("nbt")) return null
+        val itemId = JsonUtils.getString(obj, "item", "")
+        if (itemId.isBlank()) return null
+        val item = Item.getByNameOrId(itemId) ?: return null
+        val stack = ItemStack(item, 1)
+        applyExtraNbt(stack, obj.get("nbt"))
+        return stack
     }
 
     private fun parseIngredient(element: JsonElement, context: JsonContext): Ingredient {

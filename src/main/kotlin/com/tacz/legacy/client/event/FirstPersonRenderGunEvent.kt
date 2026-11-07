@@ -30,6 +30,7 @@ import com.tacz.legacy.util.math.PerlinNoise
 import com.tacz.legacy.util.math.SecondOrderDynamics
 import net.minecraft.client.Minecraft
 import net.minecraft.client.entity.EntityPlayerSP
+import net.minecraft.client.gui.inventory.GuiContainer
 import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.util.EnumHand
 import net.minecraft.util.ResourceLocation
@@ -187,6 +188,14 @@ internal object FirstPersonRenderGunEvent {
     internal fun onRenderHand(event: RenderSpecificHandEvent) {
         val player = Minecraft.getMinecraft().player ?: return
         val renderedMainItem = KeepingItemRenderer.getRenderer()?.currentItem ?: player.heldItemMainhand
+
+        // [0.6.4-REV] 背包/容器界面打开时收枪：第一人称隐藏枪（QA：背包收枪，关背包自动恢复）。
+        // 只对容器类 GUI(GuiContainer，含背包)隐藏；装配件界面(GunRefitScreen=GuiScreen 非容器)保留枪，避免 0.6.3 开界面枪消失的副作用。
+        val currentScreen = Minecraft.getMinecraft().currentScreen
+        if (currentScreen is GuiContainer && renderedMainItem.item is IGun) {
+            event.isCanceled = true
+            return
+        }
 
         // Only handle main hand
         if (event.hand != EnumHand.MAIN_HAND) {

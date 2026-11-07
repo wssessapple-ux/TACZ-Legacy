@@ -48,6 +48,8 @@ internal object LegacyItems {
     internal val ATTACHMENT: AttachmentItem = AttachmentItem().named("attachment", LegacyCreativeTabs.PARTS)
     internal val AMMO_BOX: AmmoBoxItem = AmmoBoxItem().named("ammo_box", LegacyCreativeTabs.OTHER)
     internal val TARGET_MINECART: LegacySimpleItem = LegacySimpleItem(maxStackSize = 1).named("target_minecart", LegacyCreativeTabs.OTHER)
+    internal val DRONE_CIVILIAN: DroneItem = DroneItem(isMilitary = false).named("drone_civilian", LegacyCreativeTabs.OTHER)
+    internal val DRONE_MILITARY: DroneItem = DroneItem(isMilitary = true).named("drone_military", LegacyCreativeTabs.OTHER)
 
     internal val GUN_SMITH_TABLE: LegacyBlockItem = createBlockItem(LegacyBlocks.GUN_SMITH_TABLE)
     internal val WORKBENCH_A: LegacyBlockItem = createBlockItem(LegacyBlocks.WORKBENCH_A)
@@ -62,6 +64,8 @@ internal object LegacyItems {
         ATTACHMENT,
         AMMO_BOX,
         TARGET_MINECART,
+        DRONE_CIVILIAN,
+        DRONE_MILITARY,
         GUN_SMITH_TABLE,
         WORKBENCH_A,
         WORKBENCH_B,
@@ -858,4 +862,110 @@ private fun appendAdvancedTooltip(
     }
     tooltip += "${TextFormatting.DARK_GRAY}TACZ ID: $runtimeId"
     displayId?.let { tooltip += "${TextFormatting.DARK_GRAY}Display: $it" }
+}
+
+/**
+ * 自杀式无人机物品。
+ *
+ * 交互状态机：
+ * - 未锁定：对准 EntityLivingBase（非自己）右键 → 锁定；对准空气/方块 → PASS，不拦截正常交互
+ * - 已锁定：潜行+右键 → 取消锁定；普通右键 → 发射前校验，通过则生成 EntityDrone
+ *
+ * 发射前校验：
+ * - 目标不存在/死亡 → 提示“目标已失效”，清除锁定，不消耗物品
+ * - 目标不在同一维度 → 提示“目标不在当前维度”，清除锁定
+ */
+internal open class DroneItem(private val isMilitary: Boolean) : Item() {
+    init {
+        maxStackSize = 16
+    }
+
+    override fun onItemRightClick(worldIn: World, playerIn: EntityPlayer, handIn: EnumHand): ActionResult<ItemStack> {
+        val stack = playerIn.getHeldItem(handIn)
+        if (worldIn.isRemote) {
+            return ActionResult.newResult(EnumActionResult.PASS, stack)
+        }
+
+        val tag = stack.tagCompound
+        val targetId = if (tag != null && tag.hasKey("TargetId")) tag.getInteger("TargetId") else -1
+
+        if (targetId == -1) {
+            // 未锁定：尝试锁定准星指向的实体
+            val target = raycastEntity(worldIn, playerIn)
+                // 对准空气/方块/自己：不拦截，让游戏正常交互（开箱子/吃东西）
+                ?: return ActionResult.newResult(EnumActionResult.PASS, stack)
+
+            ensureTag(stack).setInteger("TargetId", target.entityId)
+            playerIn.sendMessage(
+                net.minecraft.util.text.TextComponentString("§a已锁定：${target.name}，右键发射，潜行+右键取消")
+            )
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        // 已锁定状态
+        if (playerIn.isSneaking) {
+            // 潜行+右键：取消锁定
+            stack.tagCompound?.removeTag("TargetId")
+            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§7已取消锁定"))
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        // 普通右键：发射前校验
+        val target = worldIn.getEntityByID(targetId)
+        if (target == null || !target.isEntityAlive || target !is EntityLivingBase) {
+            stack.tagCompound?.removeTag("TargetId")
+            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§c目标已失效，锁定已清除"))
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        if (target.dimension != playerIn.dimension) {
+            stack.tagCompound?.removeTag("TargetId")
+            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§c目标不在当前维度，锁定已清除"))
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        // 校验通过，生成无人机实体
+        val drone = com.tacz.legacy.common.entity.EntityDrone(worldIn, playerIn, target, isMilitary)
+        worldIn.spawnEntity(drone)
+
+        stack.shrink(1)
+        if (stack.count > 0) {
+            ensureTag(stack).removeTag("TargetId")
+        }
+        return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+    }
+
+    private fun raycastEntity(world: World, player: EntityPlayer): EntityLivingBase? {
+        val reach = 16.0
+        val eyePos = player.getPositionEyes(1.0f)
+        val look = player.lookVec
+        val endPos = eyePos.add(look.x * reach, look.y * reach, look.z * reach)
+
+        val candidates = world.getEntitiesWithinAABB(
+            EntityLivingBase::class.java,
+            player.entityBoundingBox
+                .expand(look.x * reach, look.y * reach, look.z * reach)
+                .grow(1.0)
+        )
+
+        var closest: EntityLivingBase? = null
+        var closestDistSq = reach * reach
+
+        for (entity in candidates) {
+            if (entity == player || !entity.canBeCollidedWith()) continue
+
+            // 用实体包围盒做射线相交检测，比手工算距离可靠
+            val box = entity.entityBoundingBox.grow(0.3)
+            val intercept = box.calculateIntercept(eyePos, endPos)
+            if (intercept != null && intercept.hitVec != null) {
+                val distSq = eyePos.squareDistanceTo(intercept.hitVec)
+                if (distSq < closestDistSq) {
+                    closestDistSq = distSq
+                    closest = entity
+                }
+            }
+        }
+
+        return closest
+    }
 }

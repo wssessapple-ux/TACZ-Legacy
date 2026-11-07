@@ -307,3 +307,7 @@ tooltip.tacz.page.next=下一页
 tooltip.tacz.page.previous=上一页
 tooltip.tacz.refit.unload=卸载
 hud.tacz.heat.overheat=过热！
+
+item.tacz.drone_civilian.name=民用无人机
+item.tacz.drone_military.name=军用无人机
+entity.tacz.drone.name=无人机

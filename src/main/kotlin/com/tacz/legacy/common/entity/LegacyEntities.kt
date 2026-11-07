@@ -61,9 +61,17 @@ internal object LegacyEntities {
         .tracker(64, 1, true)
         .build()
 
+    internal val DRONE: EntityEntry = EntityEntryBuilder.create<EntityDrone>()
+        .entity(EntityDrone::class.java)
+        .id(ResourceLocation(TACZLegacy.MOD_ID, "drone"), 2)
+        .name("drone")
+        .tracker(64, 1, true)
+        .build()
+
     internal fun registerAll(registry: IForgeRegistry<EntityEntry>): Unit {
         registry.register(BULLET)
         registry.register(TARGET_MINECART)
+        registry.register(DRONE)
     }
 }
 
@@ -758,6 +766,12 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
             target.hurtResistantTime = 0
         }
         var applied = false
+        // [0.6.4-REV] 原版受击退抵消：MC 1.12.2 EntityLivingBase.attackEntityFrom 对"来源实体(getTrueSource 非 null)"的伤害
+        // 无条件 knockBack(0.4F)，与是否投射物无关（子弹 true source=开枪玩家→必然触发）。
+        // 命中后保存并恢复目标 motion，原样抵消该击退：只影响子弹命中，伤害/仇恨/点燃不受影响。
+        val origMotionX = target.motionX
+        val origMotionY = target.motionY
+        val origMotionZ = target.motionZ
         if (damageSplit.first > 0.0f) {
             applied = target.attackEntityFrom(createBulletDamageSource(target, ignoreArmor = false), damageSplit.first) || applied
         }
@@ -767,7 +781,10 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
             }
             applied = target.attackEntityFrom(createBulletDamageSource(target, ignoreArmor = true), damageSplit.second) || applied
         }
-        // 原版 TaCZ 子弹无击退，移植对齐：移除命中击退（knockback 字段保留用于存档兼容与爆炸配置）。
+        target.motionX = origMotionX
+        target.motionY = origMotionY
+        target.motionZ = origMotionZ
+        // [0.6.4-REV] 原版 TaCZ 子弹无击退，移植对齐：移除命中击退（knockback 字段保留用于存档兼容与爆炸配置）。
         if (igniteEntity && !target.world.isRemote && LegacyConfigManager.common.igniteEntity) {
             target.setFire(igniteEntityTime)
         }

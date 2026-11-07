@@ -67,6 +67,12 @@ public class ClientMessagePlayerShoot() : IMessage, IMessageHandler<ClientMessag
             val heatAfter = iGunAfter?.getHeatAmount(player.heldItemMainhand) ?: 0f
             val lockedAfter = iGunAfter?.isOverheatLocked(player.heldItemMainhand) ?: false
             val gunIdAfter = iGunAfter?.getGunId(player.heldItemMainhand)?.toString()
+            val barrelAfter = iGunAfter?.hasBulletInBarrel(player.heldItemMainhand) ?: false
+            val useInvAmmoAfter = iGunAfter?.useInventoryAmmo(player.heldItemMainhand) ?: false
+            TACZLegacy.logger.info(
+                "[AmmoSync] SERVER_SHOOT_DONE result={} gunId={} serverAmmoCount={} barrel={} useInvAmmo={} heat={} locked={}",
+                result, gunIdAfter, ammoAfter, barrelAfter, useInvAmmoAfter, heatAfter, lockedAfter,
+            )
             TACZNetworkHandler.sendToPlayer(
                 ServerMessageShootState(result, gunIdAfter, ammoAfter, heatAfter, lockedAfter),
                 player,

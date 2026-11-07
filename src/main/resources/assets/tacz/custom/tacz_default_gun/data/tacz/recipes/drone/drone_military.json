@@ -1,0 +1,47 @@
+{
+  "materials": [
+    {
+      "item": {
+        "item": "minecraft:iron_ingot"
+      },
+      "count": 5
+    },
+    {
+      "item": {
+        "item": "minecraft:gold_ingot"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:quartz"
+      },
+      "count": 2
+    },
+    {
+      "item": {
+        "item": "tacz:ammo",
+        "nbt": {
+          "AmmoId": "tacz:762x39"
+        }
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "tacz:attachment",
+        "nbt": {
+          "AttachmentId": "tacz:sight_acro_pistol"
+        }
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "custom",
+    "item": {
+      "item": "tacz:drone_military"
+    }
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

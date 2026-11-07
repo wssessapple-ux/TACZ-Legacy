@@ -8,6 +8,7 @@ import com.tacz.legacy.client.model.bedrock.BedrockPart;
 import com.tacz.legacy.client.model.bedrock.ModelRendererWrapper;
 import com.tacz.legacy.client.model.functional.BeamRenderer;
 import com.tacz.legacy.client.model.functional.TextShowRender;
+import com.tacz.legacy.client.renderer.scope.ScopeFbo;
 import com.tacz.legacy.client.util.RenderHelper;
 import com.tacz.legacy.client.resource.pojo.display.gun.TextShow;
 import com.tacz.legacy.client.resource.pojo.model.BedrockModelPOJO;
@@ -332,6 +333,61 @@ public class BedrockAttachmentModel extends BedrockAnimatedModel {
             RenderHelper.disableItemEntityStencilTest();
         }
         super.render();
+    }
+    private void renderScopeOcularMask() {
+        Minecraft mc = Minecraft.getMinecraft();
+        int screenWidth = mc.displayWidth;
+        int screenHeight = mc.displayHeight;
+        float centerX = screenWidth / 2.0f;
+        float centerY = screenHeight / 2.0f;
+        float radius = Math.min(centerX, centerY) * 0.6f;
+
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPushMatrix();
+        GL11.glLoadIdentity();
+        GL11.glOrtho(0, screenWidth, 0, screenHeight, -100, 100);
+
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPushMatrix();
+        GL11.glLoadIdentity();
+
+        GL11.glColorMask(false, false, false, false);
+        GL11.glDepthMask(false);
+        GL11.glStencilMask(0xFF);
+        GL11.glStencilFunc(GL11.GL_ALWAYS, 1, 0xFF);
+        GL11.glStencilOp(GL11.GL_REPLACE, GL11.GL_REPLACE, GL11.GL_REPLACE);
+
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_TRIANGLE_FAN, DefaultVertexFormats.POSITION);
+        buffer.pos(centerX, centerY, 0).endVertex();
+        for (int i = 0; i <= 8; i++) {
+            float angle = (float) (i * Math.PI * 2.0 / 8.0 - Math.PI / 2.0);
+            float x = centerX + MathHelper.cos(angle) * radius;
+            float y = centerY + MathHelper.sin(angle) * radius;
+            buffer.pos(x, y, 0).endVertex();
+        }
+        tessellator.draw();
+
+        GL11.glColorMask(true, true, true, true);
+        GL11.glDepthMask(true);
+        GL11.glStencilFunc(GL11.GL_EQUAL, 0, 0xFF);
+        GL11.glStencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_KEEP);
+
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+        buffer.pos(0, 0, 0).color(0, 0, 0, 255).endVertex();
+        buffer.pos(0, screenHeight, 0).color(0, 0, 0, 255).endVertex();
+        buffer.pos(screenWidth, screenHeight, 0).color(0, 0, 0, 255).endVertex();
+        buffer.pos(screenWidth, 0, 0).color(0, 0, 0, 255).endVertex();
+        tessellator.draw();
+
+        GL11.glStencilFunc(GL11.GL_ALWAYS, 0, 0xFF);
+        GL11.glStencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_KEEP);
+
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPopMatrix();
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPopMatrix();
     }
 
     private void resetStencilState() {
