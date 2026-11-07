@@ -8,6 +8,7 @@ import com.tacz.legacy.api.vmlib.LuaGunAnimationConstant
 import com.tacz.legacy.api.vmlib.LuaLibrary
 import com.tacz.legacy.client.audio.TACZAudioReference
 import com.tacz.legacy.client.audio.TACZAudioRuntime
+import com.tacz.legacy.client.compat.playeranimator.PlayerAnimatorCompat
 import com.tacz.legacy.client.model.BedrockAmmoModel
 import com.tacz.legacy.client.sound.GunPackAssetLocator
 import com.tacz.legacy.client.sound.GunPackSoundResourcePack
@@ -291,6 +292,9 @@ internal object TACZClientAssetManager {
 
         // Build GunDisplayInstance for each gun display
         buildGunDisplayInstances()
+
+        // 第三人称玩家动画：把 display 引用的 player_animator 文件喂给 PlayerAnimator（装了才生效）
+        PlayerAnimatorCompat.reload(snapshot)
     }
 
     private fun buildAttachmentIndices(snapshot: TACZRuntimeSnapshot) {
@@ -350,6 +354,7 @@ internal object TACZClientAssetManager {
         gunDisplayInstances.clear()
         ammoShellRenderAssets.clear()
         TACZAudioRuntime.clear()
+        PlayerAnimatorCompat.clear()
     }
 
     private fun buildAmmoShellRenderAsset(ammoId: ResourceLocation): ShellRenderAsset? {

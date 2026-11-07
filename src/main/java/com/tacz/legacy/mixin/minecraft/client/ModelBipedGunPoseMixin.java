@@ -1,6 +1,7 @@
 package com.tacz.legacy.mixin.minecraft.client;
 
 import com.tacz.legacy.api.item.IGun;
+import com.tacz.legacy.client.compat.playeranimator.PlayerAnimatorCompat;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.entity.Entity;
@@ -16,6 +17,9 @@ public abstract class ModelBipedGunPoseMixin {
 
     @Inject(method = "setRotationAngles", at = @At("TAIL"))
     private void tacz$forceGunArmPose(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scaleFactor, Entity entityIn, CallbackInfo ci) {
+        // 装了 PlayerAnimator 就让路：它的 mixin 同样在 setRotationAngles 的 TAIL 里写
+        // bipedRightArm/bipedLeftArm，两边抢同一组 rotateAngle 会互相覆盖导致手臂抖。
+        if (PlayerAnimatorCompat.isAvailable()) return;
         if (!(entityIn instanceof EntityLivingBase)) return;
         EntityLivingBase living = (EntityLivingBase) entityIn;
         ItemStack mainHand = living.getHeldItemMainhand();

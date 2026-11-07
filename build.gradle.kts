@@ -184,6 +184,10 @@ dependencies {
 
     implementation(rfg.deobf("curse.maven:jei-238222:5101333"))
 
+    // 第三人称玩家动作动画：PlayerAnimator 1.12.2 移植版，运行时为软依赖（玩家自己装），
+    // 编译期只需要它的 API，所以打成 compileOnly，不会进我们的 jar。
+    compileOnly(files("libs/playeranimator-1.12.2-1.0.2-rc1.jar"))
+
     testImplementation("junit:junit:4.13.2")
     
     if (use_assetmover.toBoolean()) {

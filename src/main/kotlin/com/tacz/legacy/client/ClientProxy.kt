@@ -2,6 +2,7 @@ package com.tacz.legacy.client
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.client.animation.screen.RefitTransform
+import com.tacz.legacy.client.compat.playeranimator.PlayerAnimatorClientHooks
 import com.tacz.legacy.client.audio.TACZClientAudioHooks
 import com.tacz.legacy.client.event.FirstPersonRenderGunEvent
 import com.tacz.legacy.client.event.LegacyClientHitMarkHandler
@@ -57,6 +58,8 @@ internal class ClientProxy : CommonProxy() {
         // Forge 1.12 only scans static subscribers when registering the class itself.
         MinecraftForge.EVENT_BUS.register(FirstPersonRenderGunEvent::class.java)
         MinecraftForge.EVENT_BUS.register(TACZCameraRecoilHandler::class.java)
+        // 第三人称玩家动画驱动（PlayerAnimator 软依赖，没装库时整个钩子是空转）
+        MinecraftForge.EVENT_BUS.register(PlayerAnimatorClientHooks::class.java)
     }
 
     override fun preInit(): Unit {
