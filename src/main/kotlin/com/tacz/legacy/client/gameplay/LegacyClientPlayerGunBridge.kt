@@ -7,6 +7,7 @@ import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.api.item.gun.FireMode
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.client.animation.statemachine.GunAnimationConstant
+import com.tacz.legacy.client.compat.playeranimator.PlayerAnimatorCompat
 import com.tacz.legacy.client.gui.GunRefitScreen
 import com.tacz.legacy.client.input.LegacyInputExtraCheck
 import com.tacz.legacy.client.input.LegacyKeyBindings
@@ -242,6 +243,8 @@ internal object LegacyClientPlayerGunBridge {
             }
             val meleeInput = LegacyClientGunAnimationDriver.determineMeleeInput(stack) ?: continue
             LegacyClientGunAnimationDriver.triggerIfInitialized(stack, meleeInput)
+            // 第三人称：挥砍动作（上游是随机三段）
+            PlayerAnimatorCompat.onMelee(player)
             TACZNetworkHandler.sendToServer(ClientMessagePlayerMelee())
         }
     }
@@ -342,6 +345,8 @@ internal object LegacyClientPlayerGunBridge {
                 val result = attemptShoot(player, operator)
                 lastShootSuccess = result == ShootResult.SUCCESS
                 if (result == ShootResult.SUCCESS) {
+                    // 第三人称：真的打出去了才播一次开火动作（once 层，事件驱动）
+                    PlayerAnimatorCompat.onShoot(player)
                     // 只有真正开了一枪才打断装填；按住左键但不射击（冷却/空枪）时不再反复取消，换弹可正常响应
                     cancelReloadIfNeeded(stack, operator)
                 }

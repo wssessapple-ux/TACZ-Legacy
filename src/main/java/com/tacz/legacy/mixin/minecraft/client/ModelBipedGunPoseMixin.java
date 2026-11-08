@@ -17,9 +17,9 @@ public abstract class ModelBipedGunPoseMixin {
 
     @Inject(method = "setRotationAngles", at = @At("TAIL"))
     private void tacz$forceGunArmPose(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scaleFactor, Entity entityIn, CallbackInfo ci) {
-        // 装了 PlayerAnimator 就让路：它的 mixin 同样在 setRotationAngles 的 TAIL 里写
-        // bipedRightArm/bipedLeftArm，两边抢同一组 rotateAngle 会互相覆盖导致手臂抖。
-        if (PlayerAnimatorCompat.isAvailable()) return;
+        // 装了 PlayerAnimator 且这把枪真有第三人称动画时才让路；否则继续用写死姿势，
+        // 免得没有动画数据的枪变成“手臂垂着、枪飘在腰上”。
+        if (PlayerAnimatorCompat.shouldSkipVanillaArmPose(entityIn instanceof EntityLivingBase ? (EntityLivingBase) entityIn : null)) return;
         if (!(entityIn instanceof EntityLivingBase)) return;
         EntityLivingBase living = (EntityLivingBase) entityIn;
         ItemStack mainHand = living.getHeldItemMainhand();

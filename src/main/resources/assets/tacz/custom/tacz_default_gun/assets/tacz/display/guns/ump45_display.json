@@ -10,6 +10,8 @@
   "animation": "tacz:ump45",
   "use_default_animation": "rifle",
   "third_person_animation": "default",
+  // 第三人称动画，安装 player animator 模组后才会显示
+  "player_animator_3rd": "tacz:rifle_default.player_animation",
   "transform": {
     "scale": {
       "thirdperson": [0.6, 0.6, 0.6],

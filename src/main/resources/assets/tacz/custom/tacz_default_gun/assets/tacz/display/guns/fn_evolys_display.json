@@ -10,6 +10,8 @@
   "animation": "tacz:fn_evolys",
   "use_default_animation": "rifle",
   "third_person_animation": "default",
+  // 第三人称动画，安装 player animator 模组后才会显示
+  "player_animator_3rd": "tacz:rifle_default.player_animation",
   "state_machine": "tacz:fn_evolys_state_machine",
   "transform": {
     "scale": {

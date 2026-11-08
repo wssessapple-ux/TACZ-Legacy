@@ -1,6 +1,8 @@
 package com.tacz.legacy.client.compat.playeranimator
 
 import com.tacz.legacy.common.resource.TACZRuntimeSnapshot
+import net.minecraft.entity.EntityLivingBase
+import net.minecraft.entity.player.EntityPlayer
 import net.minecraftforge.fml.common.Loader
 
 /**
@@ -52,6 +54,25 @@ internal object PlayerAnimatorCompat {
         return created
     }
 
+    /**
+     * 原生手臂姿势是否要让路给 PlayerAnimator。
+     *
+     * **按枪判断**，不是全局判断：只有当前这把枪真的解析出动画、且层里确实有东西在播时
+     * 才让路；枪包里没写 `player_animator_3rd` 的枪继续用 [ModelBipedGunPoseMixin]
+     * 的写死姿势，不至于变成“手臂垂着、枪飘在腰上”。
+     */
+    @JvmStatic
+    fun shouldSkipVanillaArmPose(entity: EntityLivingBase?): Boolean {
+        if (!isAvailable()) return false
+        if (entity == null) return false
+        val bridge = bridge() ?: return false
+        return try {
+            bridge.isAnimated(entity)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     /** gun pack 客户端资源重载完成后调用，重新收集 player_animator 动画文件。 */
     fun reload(snapshot: TACZRuntimeSnapshot) {
         bridge()?.reload(snapshot)
@@ -60,6 +81,16 @@ internal object PlayerAnimatorCompat {
     /** 客户端每 tick 驱动一次姿态选择。 */
     fun onClientTick() {
         bridge()?.onClientTick()
+    }
+
+    /** 成功打出一发子弹时调用（不是每 tick 调，只在真开火时调）。 */
+    fun onShoot(player: EntityPlayer?) {
+        bridge()?.onShoot(player)
+    }
+
+    /** 近战挥砍时调用。 */
+    fun onMelee(player: EntityPlayer?) {
+        bridge()?.onMelee(player)
     }
 
     /** 枪包列表清空时释放缓存的 clip 数据（不动已挂在玩家身上的 layer）。 */

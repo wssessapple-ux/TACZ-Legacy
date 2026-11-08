@@ -1,5 +1,7 @@
 {
   "model": "tacz:gun/m107_geo",
+  // 第三人称动画，安装 player animator 模组后才会显示
+  "player_animator_3rd": "tacz:rifle_default.player_animation",
   "texture": "tacz:gun/uv/m107",
   "lod": {
     "model": "tacz:gun/lod/m107",
