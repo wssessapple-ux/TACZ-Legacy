@@ -246,7 +246,14 @@ public class LivingEntityReload(
         val needConsumeAmmo = api.isReloadingNeedConsumeAmmo() || gunData.isReloadInfinite
 
         // 根据弹药类型补弹（上游 MAGAZINE / FUEL 两种路径）
-        if (needConsumeAmmo) {
+        if (gunData.reloadType.equals("fuel", ignoreCase = true)) {
+            // FUEL：消耗一个弹药物品把弹匣一次性填满（不是"一个物品换一发"）。
+            // 客户端拿不到真实库存，consumeAmmoFromPlayer 在客户端直接返回请求量，走预测写满。
+            val consumed = if (needConsumeAmmo) api.consumeAmmoFromPlayer(1) else 1
+            if (consumed > 0) {
+                api.putAmmoInMagazine(needAmmoCount)
+            }
+        } else if (needConsumeAmmo) {
             val consumed = api.consumeAmmoFromPlayer(needAmmoCount)
             // 客户端也预测写弹匣，避免补弹后弹匣冻结在 0（纯等服务端回传会滞后/丢失，
             // QA 实测"换弹后子弹几乎还是0"即此副作用）。

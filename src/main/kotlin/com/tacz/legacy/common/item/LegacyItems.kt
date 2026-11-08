@@ -517,11 +517,13 @@ internal class ModernKineticGunItem : Item(), IGun {
 
     override fun useInventoryAmmo(stack: ItemStack): Boolean {
         // 由 gun data 中的 reload.type 决定是否为背包直读
-        // 与上游 TACZ 一致，"inventory" 和 "fuel" 类型都直接从背包读弹
+        // 只有 "inventory" 是背包直读（每发从背包扣一颗）。
+        // "fuel" 是燃料罐式供弹：换弹时消耗一个物品把弹匣一次性填满，弹匣本身依然计数，
+        // 所以不能按背包直读处理，否则"一个物品只换一发"、"打一发弹匣就归零"。
         val gunId = getGunId(stack)
         val gun = TACZGunPackRuntimeRegistry.getSnapshot().guns[gunId] ?: return false
         val reloadType = gun.data.raw.getAsJsonObject("reload")?.get("type")?.asString
-        return reloadType == "inventory" || reloadType == "fuel"
+        return reloadType == "inventory"
     }
 
     override fun hasInventoryAmmo(shooter: EntityLivingBase, stack: ItemStack, needCheckAmmo: Boolean): Boolean {
