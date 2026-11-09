@@ -42,7 +42,6 @@ internal object LegacyClientPlayerGunBridge {
     private var lastHeldGunStack: ItemStack? = null
     private var lastShootSuccess: Boolean = false
     private var lastShootKeyDown: Boolean = false
-    private var lastSprinting: Boolean = false
 
     internal fun onClientTick(): Unit {
         val mc = Minecraft.getMinecraft()
@@ -63,7 +62,6 @@ internal object LegacyClientPlayerGunBridge {
         if (!inGame) {
             lastShootSuccess = false
             lastShootKeyDown = false
-            lastSprinting = false
             if (FocusedSmokeRuntime.isForcedAimActive && IGun.mainHandHoldGun(player)) {
                 setAimState(operator, true)
             } else if (operator.getSynIsAiming()) {
@@ -73,7 +71,8 @@ internal object LegacyClientPlayerGunBridge {
             return
         }
 
-        processSprintReloadCancel(player, operator)
+        // 疾跑不再打断换弹：按 0.7.0.1 之后的反馈，边跑边换弹是主流手感（CoD 式），
+        // 之前 sprint 上升沿取消装填会让玩家觉得"换弹总是失败"，故取消该行为。
         processAimInput(player, operator)
         processReloadInput(player, operator)
         processFireSelectInput(player, operator)
@@ -118,14 +117,6 @@ internal object LegacyClientPlayerGunBridge {
             lastHeldGunSignature = signature
         }
         lastHeldGunStack = mainHand.copy()
-    }
-
-    private fun processSprintReloadCancel(player: EntityPlayerSP, operator: IGunOperator): Unit {
-        val sprinting = player.isSprinting
-        if (sprinting && !lastSprinting) {
-            cancelReloadIfNeeded(player.heldItemMainhand, operator)
-        }
-        lastSprinting = sprinting
     }
 
     private fun processAimInput(player: EntityPlayerSP, operator: IGunOperator): Unit {
@@ -339,7 +330,8 @@ internal object LegacyClientPlayerGunBridge {
         val isBurstAuto = fireMode == FireMode.BURST && LegacyRuntimeTooltipSupport.isContinuousBurst(gunId)
 
         if (shootDown) {
-            player.isSprinting = false
+            // 不再在这里清 player.isSprinting：按住左键时每 tick 清一次会让冲刺标志
+            // 一直被抹掉，松手后必须重按 Ctrl 才能恢复，表现为"开完枪强制减速"。
             val shouldAttempt = fireMode == FireMode.AUTO || isBurstAuto || !lastShootSuccess
             if (shouldAttempt) {
                 val result = attemptShoot(player, operator)
@@ -435,7 +427,6 @@ internal object LegacyClientPlayerGunBridge {
         lastHeldGunStack = null
         lastShootSuccess = false
         lastShootKeyDown = false
-        lastSprinting = false
         LegacyClientShootCoordinator.resetTiming()
         LegacyClientGunAnimationDriver.clearTransientState()
     }

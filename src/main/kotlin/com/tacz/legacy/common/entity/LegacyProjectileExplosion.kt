@@ -39,7 +39,7 @@ internal object LegacyProjectileExplosionHelper {
         val actualDamage = damage.coerceAtLeast(0.0f)
         val damagesTerrain = destroyBlock && LegacyConfigManager.common.explosiveAmmoDestroysBlock
         val allowKnockback = knockback && LegacyConfigManager.common.explosiveAmmoKnockBack
-        TACZLegacy.logger.info(
+        TACZLegacy.logger.debug(
             "[KnockbackTrace] EXPLOSION created allowKnockback={} (nbtKnockback={}, cfgExplosiveAmmoKnockBack={}) radius={} dmg={} at {},{},{}",
             allowKnockback, knockback, LegacyConfigManager.common.explosiveAmmoKnockBack, actualRadius, actualDamage, x, y, z,
         )
@@ -132,7 +132,7 @@ internal class LegacyProjectileExplosion(
             // 用于定位"正方向(+X 东 / +Z 南)其他怪不受伤"的方向性异常。
             val offX = entity.posX - centerX
             val offZ = entity.posZ - centerZ
-            TACZLegacy.logger.info(
+            TACZLegacy.logger.debug(
                 "[AoeTrace] {} posX={} posZ={} off=({}, {}) minDist={} radius={} strength={} blocked={}",
                 entity.name,
                 "%.1f".format(entity.posX), "%.1f".format(entity.posZ),
@@ -156,7 +156,7 @@ internal class LegacyProjectileExplosion(
                 val dead = entity.isDead
                 val remote = entity.world.isRemote
                 val applied = entity.attackEntityFrom(damageSource, damageAmount)
-                TACZLegacy.logger.info(
+                TACZLegacy.logger.debug(
                     "[AoeTraceDmg] {} off=({}, {}) strength={} dmg={} damagePower={} applied={} hurtResistant={} immune={} dead={} remote={}",
                     entity.name,
                     "%.2f".format(entity.posX - centerX), "%.2f".format(entity.posZ - centerZ),
@@ -190,7 +190,7 @@ internal class LegacyProjectileExplosion(
             if (entity is EntityLivingBase) {
                 knockbackAmount = EnchantmentProtection.getBlastDamageReduction(entity, impact)
             }
-            TACZLegacy.logger.info(
+            TACZLegacy.logger.debug(
                 "[KnockbackTrace] EXPLOSION applyKnockback to {} motion+=({}, {}, {}) scale={} cfg={}",
                 entity.name,
                 normX * knockbackAmount * knockbackScale,

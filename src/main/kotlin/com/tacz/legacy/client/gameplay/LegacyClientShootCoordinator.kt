@@ -88,7 +88,7 @@ internal object LegacyClientShootCoordinator {
         val localAmmoBefore = iGun?.getCurrentAmmoCount(stack) ?: -1
         val localBarrelBefore = iGun?.hasBulletInBarrel(stack) ?: false
         val useInvAmmo = iGun?.useInventoryAmmo(stack) ?: false
-        TACZLegacy.logger.info(
+        TACZLegacy.logger.debug(
             "[AmmoSync] CLIENT_APPLY result={} serverGunId={} serverAmmo={} localGunId={} localAmmoBefore={} barrel={} useInvAmmo={}",
             result, gunId, ammoCount,
             iGun?.getGunId(stack)?.toString(), localAmmoBefore, localBarrelBefore, useInvAmmo,
@@ -152,8 +152,9 @@ internal object LegacyClientShootCoordinator {
         val hasAmmoInBarrel = iGun.hasBulletInBarrel(stack) && boltType != BoltType.OPEN_BOLT
         val hasInventoryAmmo = iGun.hasInventoryAmmo(player, stack, operator.needCheckAmmo()) || hasAmmoInBarrel
         val ammoCount = iGun.getCurrentAmmoCount(stack) + (if (hasAmmoInBarrel) 1 else 0)
-        // 疾跑优先拦截：疾跑时不触发空枪/干火音效，直接不开枪
-        if (operator.getSynSprintTime() > 0f) return ShootResult.IS_SPRINTING
+        // 疾跑不再拦截射击，也不清冲刺过渡值：sprintTimeS 只影响姿势与动画，
+        // 清零会让第三人称在开火瞬间从疾跑姿势硬切回普通姿势，看起来一顿。
+        // 疾跑与射击互不干扰，与服务端判断保持一致。
         val noAmmo = (useInventoryAmmo && !hasInventoryAmmo) || (!useInventoryAmmo && ammoCount < 1)
         if (noAmmo) {
             TACZClientGunSoundCoordinator.playDryFireSound(player, display)

@@ -92,8 +92,11 @@ public class LivingEntityShoot(
         if (draw.getDrawCoolDown() != 0L) return ShootResult.IS_DRAWING
         // 检查是否在拉栓
         if (data.isBolting) return ShootResult.IS_BOLTING
-        // 检查是否在奔跑
-        if (data.sprintTimeS > 0) return ShootResult.IS_SPRINTING
+        // 疾跑中开火不再拦截，也不再修改疾跑状态。
+        // 最早这里直接返回 IS_SPRINTING，与客户端"本地强清疾跑"的状态错位：客户端已经
+        // 播了开火音效、扣了弹并发出 C2S，服务端又拒绝，玩家看到的就是"有反馈没有子弹"。
+        // 之后改成"开枪即停跑"，副作用是按住左键会每 tick 抹一次疾跑标志，松手后必须
+        // 重按 Ctrl 才能恢复冲刺。现在回归原生行为：疾跑与射击互不干扰。
 
         // 弹药检查
         val gunOperator = IGunOperator.fromLivingEntity(shooter)

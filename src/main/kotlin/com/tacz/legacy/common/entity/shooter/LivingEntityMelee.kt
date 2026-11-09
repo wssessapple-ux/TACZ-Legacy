@@ -225,8 +225,8 @@ public class LivingEntityMelee(
 
     private fun applyMeleeKnockback(target: EntityLivingBase, knockback: Float, direction: Vec3d) {
         if (knockback <= 0.0f) return
-        TACZLegacy.logger.info(
-            "[KnockbackTrace] MELEE applyKnockback to {} strength={} dir=({}, {}, {}) (ungated)",
+        TACZLegacy.logger.debug(
+            "[KnockbackTrace] MELEE applyKnockback to {} strength={} dir=({}, {}, {})",
             target.name, knockback, direction.x, direction.y, direction.z,
         )
         target.addVelocity(direction.x * knockback * 0.6, 0.1, direction.z * knockback * 0.6)

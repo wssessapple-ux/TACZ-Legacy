@@ -20,6 +20,7 @@ internal data class CommonConfigValues(
     var explosiveAmmoFire: Boolean = false,
     var explosiveAmmoKnockBack: Boolean = false,
     var explosiveAmmoVisibleDistance: Int = 192,
+    var waterFriction: Double = 0.4,
     var passThroughBlocks: List<String> = emptyList(),
     var destroyGlass: Boolean = true,
     var igniteBlock: Boolean = true,
@@ -224,6 +225,11 @@ internal object LegacyConfigManager {
                 "ExplosiveAmmoVisibleDistance", "ammo", 192, 0, Int.MAX_VALUE,
                 "The distance at which the explosion effect can be seen."
             )
+            common.waterFriction = cfg.getFloat(
+                "WaterFriction", "ammo", 0.4f, 0.0f, 0.9f,
+                "Friction applied to bullets travelling through water. 0.4 matches upstream TACZ; " +
+                    "lower values make bullets fly further under water (0.15 is roughly realistic)."
+            ).toDouble()
             common.passThroughBlocks = cfg.getStringList(
                 "PassThroughBlocks", "ammo", emptyArray(),
                 "Those blocks that the ammo can pass through."

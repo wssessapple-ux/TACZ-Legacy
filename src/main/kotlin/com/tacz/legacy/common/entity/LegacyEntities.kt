@@ -22,13 +22,16 @@ import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.item.EntityMinecartEmpty
 import net.minecraft.entity.projectile.EntityThrowable
 import net.minecraft.entity.monster.EntityEnderman
+import net.minecraft.block.material.Material
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
 import net.minecraft.init.Blocks
 import net.minecraft.util.DamageSource
 import net.minecraft.util.EntityDamageSource
+import net.minecraft.util.EnumParticleTypes
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.AxisAlignedBB
+import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.RayTraceResult
 import net.minecraft.util.math.Vec3d
@@ -731,9 +734,25 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         // ---- 阻力与重力 (只用 TACZ 的参数，不叠加 vanilla 0.99f) ----
         var frictionFactor = friction
         var gravityValue = bulletGravity
-        if (isInWater) {
-            frictionFactor = 0.4f
+        if (isInsideWater()) {
+            // 上游 TACZ 同款 0.4 / 0.6；0.4 已抽成配置项 WaterFriction，默认值与上游一致。
+            frictionFactor = LegacyConfigManager.common.waterFriction.toFloat()
             gravityValue *= 0.6f
+            // 上游在水里每 tick 吐 4 个气泡，移植版此前完全没有，入水后子弹"凭空消失"。
+            // 服务端不生成粒子（粒子只在客户端），所以这里只在客户端跑。
+            if (world.isRemote) {
+                repeat(4) {
+                    world.spawnParticle(
+                        EnumParticleTypes.WATER_BUBBLE,
+                        posX - motionX * 0.25,
+                        posY - motionY * 0.25,
+                        posZ - motionZ * 0.25,
+                        motionX,
+                        motionY,
+                        motionZ,
+                    )
+                }
+            }
         }
         motionX *= (1.0 - frictionFactor)
         motionY *= (1.0 - frictionFactor)
@@ -745,6 +764,19 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
         if (lifespan <= 0) setDead()
     }
 
+    /**
+     * 是否处于水中。
+     *
+     * 不能直接用 vanilla 的 [Entity.isInWater]：本实体重写了 [onUpdate] 只调 super.onEntityUpdate()，
+     * 手写位移、从不调用 handleWaterMovement()，所以那个 inWater 标记永远不会被置位 ——
+     * 早先按 isInWater 判断，水阻 0.4 / 重力 0.6 那一整段其实是死代码（入水既不减速也不出气泡）。
+     * 这里改为直接查当前位置方块材质，流水同样算水（材质都是 Material.WATER）。
+     */
+    private fun isInsideWater(): Boolean {
+        val state = world.getBlockState(BlockPos(posX, posY, posZ))
+        return state.material === Material.WATER
+    }
+
     private fun lerpRotation(previous: Float, current: Float): Float {
         var delta = MathHelper.wrapDegrees(current - previous)
         delta = delta.coerceIn(-180.0f, 180.0f)
@@ -753,7 +785,7 @@ internal class EntityKineticBullet : EntityThrowable, IEntityAdditionalSpawnData
 
     private fun applyDirectHitDamage(target: Entity, hitPosition: Vec3d, headShot: Boolean): HitFeedbackResult {
         val totalDamage = resolveEffectiveDamageAt(hitPosition)
-        TACZLegacy.logger.info(
+        TACZLegacy.logger.debug(
             "[KnockbackTrace] BULLET direct hit {} dmg={} headshot={} (no-knockback per upstream alignment)",
             target.name, totalDamage, headShot,
         )

@@ -66,6 +66,15 @@ public class BedrockAttachmentModel extends BedrockAnimatedModel {
     protected final List<Boolean> scopeOcularFlags = new ArrayList<>();
     protected final List<List<BedrockPart>> divisionNodePaths = new ArrayList<>();
     protected final List<List<BedrockPart>> laserBeamPaths = new ArrayList<>();
+    /**
+     * 上游模型约定：名字以 "_hide" 结尾、或叫 "hide_when_ads" 的部件，只在开镜（ADS）时隐藏。
+     * 典型用法是把镜座、旋钮、镜筒上盖这类挡住目镜的部件收起来（如 scope_standard_8x 的
+     * ads_hide / mount_hide / knob_base_hide / scope_hide，scope_lpvo_1_6 的 hide_when_ads）。
+     * 腰射和第三人称必须恢复可见，否则枪模会缺零件。
+     */
+    private final List<ModelRendererWrapper> adsHideWrappers = new ArrayList<>();
+    @Nullable
+    private Boolean adsHiddenState;
     @Nullable
     private ItemStack currentGunItem;
     @Nullable
@@ -84,6 +93,7 @@ public class BedrockAttachmentModel extends BedrockAnimatedModel {
         hideIndexedNodes(OCULAR_NODE);
         hideIndexedNodes(OCULAR_SCOPE_NODE);
         hideIndexedNodes(OCULAR_SIGHT_NODE);
+        cacheAdsHideNodes();
     }
 
     private void cacheScopeViewPaths() {
@@ -138,6 +148,50 @@ public class BedrockAttachmentModel extends BedrockAnimatedModel {
             wrapper.setHidden(true);
             wrapper = modelMap.get(baseNodeName + '_' + index++);
         }
+    }
+
+    /**
+     * 收集开镜时需要隐藏的部件。判定只看名字，不依赖具体镜，所以以后新镜自带这套命名也能直接生效。
+     */
+    private void cacheAdsHideNodes() {
+        for (Map.Entry<String, ModelRendererWrapper> entry : modelMap.entrySet()) {
+            String name = entry.getKey();
+            if (name == null) {
+                continue;
+            }
+            String lower = name.toLowerCase();
+            if (lower.endsWith("_hide") || lower.startsWith("hide_when_ads")) {
+                adsHideWrappers.add(entry.getValue());
+            }
+        }
+    }
+
+    /**
+     * 开镜时隐藏 *_hide 部件，非开镜（腰射 / 第三人称）恢复。状态没变化就不重复写，避免每帧刷 visible。
+     */
+    public void applyAdsHiding(boolean aiming) {
+        if (adsHideWrappers.isEmpty()) {
+            return;
+        }
+        if (adsHiddenState != null && adsHiddenState == aiming) {
+            return;
+        }
+        adsHiddenState = aiming;
+        for (ModelRendererWrapper wrapper : adsHideWrappers) {
+            wrapper.setHidden(aiming);
+        }
+    }
+
+    private float resolveAimingProgress() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null || minecraft.player == null) {
+            return 0.0f;
+        }
+        Float prepared = FirstPersonRenderGunEvent.getPreparedAimingProgress();
+        if (prepared != null) {
+            return MathHelper.clamp(prepared, 0.0f, 1.0f);
+        }
+        return MathHelper.clamp(IGunOperator.fromLivingEntity(minecraft.player).getSynAimingProgress(), 0.0f, 1.0f);
     }
 
     private void cacheLaserBeamPaths() {
@@ -202,6 +256,8 @@ public class BedrockAttachmentModel extends BedrockAnimatedModel {
 
         BeamRenderer.RenderContext renderContext = BeamRenderer.getRenderContext();
         boolean firstPerson = renderContext.isFirstPerson();
+        // 开镜时收起 *_hide 部件（镜座/旋钮/上盖），腰射与第三人称恢复
+        applyAdsHiding(firstPerson && resolveAimingProgress() > 0.5f);
         if (!isScope && !isSight) {
             renderLaserBeams();
         }

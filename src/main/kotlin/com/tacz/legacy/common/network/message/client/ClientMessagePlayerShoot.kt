@@ -69,7 +69,7 @@ public class ClientMessagePlayerShoot() : IMessage, IMessageHandler<ClientMessag
             val gunIdAfter = iGunAfter?.getGunId(player.heldItemMainhand)?.toString()
             val barrelAfter = iGunAfter?.hasBulletInBarrel(player.heldItemMainhand) ?: false
             val useInvAmmoAfter = iGunAfter?.useInventoryAmmo(player.heldItemMainhand) ?: false
-            TACZLegacy.logger.info(
+            TACZLegacy.logger.debug(
                 "[AmmoSync] SERVER_SHOOT_DONE result={} gunId={} serverAmmoCount={} barrel={} useInvAmmo={} heat={} locked={}",
                 result, gunIdAfter, ammoAfter, barrelAfter, useInvAmmoAfter, heatAfter, lockedAfter,
             )
