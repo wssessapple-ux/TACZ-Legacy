@@ -10,12 +10,11 @@
 
 📥 **Download on CurseForge:** https://www.curseforge.com/minecraft/mc-mods/tacz-legacy
 
-📥 **Download on Modrinth:** https://modrinth.com/mod/tacz-legacy
 
-⚠️ **紧急通知：0.1.0 为早期纯编译版，未修复任何 Bug（高倍镜黑屏、服务器卡顿等）真正的修复版 (0.2.0/0.3.0/0.4.0/0.5.0/0.5.1/0.6.0-Beta/0.6.1-Beta) 已在 CurseForge 上架，请前往下载！想提前体验最新内测版的玩家，请前往 GitHub Releases 下载！
+⚠️ **紧急通知：0.1.0 为早期纯编译版，未修复任何 Bug（高倍镜黑屏、服务器卡顿等）真正的修复版 (0.2.0~0.7.0) 已在 CurseForge 上架，请前往下载！想提前体验最新内测版的玩家，请前往 GitHub Releases 下载！
 ---
 
-**📢 Modrinth 更新延迟说明**：由于 Modrinth 官方审核排队极慢（已卡 3 周），目前最新版本（0.3.0/0.4.0/0.5.0/0.5.1/0.6.0-Beta/0.6.1-Beta）仅在 CurseForge 和 GitHub Releases 提供。请前往这两处下载，不要等 Modrinth 了！
+**📢 Modrinth 说明**：由于 Modrinth 官方审核排队极慢（已卡一个月  ），目前项目已在Modrinth删除,现今最新版本（0.2.0~0.7.0）仅在 CurseForge 和 GitHub Releases 提供。请前往这两处下载，不要等 Modrinth 了！
 ---
 
 
