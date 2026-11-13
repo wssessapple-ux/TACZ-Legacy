@@ -1,5 +1,6 @@
 package com.tacz.legacy.common.entity.shooter
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.ReloadState
 import com.tacz.legacy.api.entity.ShootResult
 import com.tacz.legacy.api.event.GunReloadEvent
@@ -30,46 +31,63 @@ public class LivingEntityReload(
      * 发起换弹操作。
      */
     public fun reload() {
-        val supplier = data.currentGunItem ?: return
+        val supplier = data.currentGunItem ?: run {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort: no currentGunItem"); return
+        }
         val currentGunItem = supplier.get()
-        val iGun = currentGunItem.item as? IGun ?: return
+        val iGun = currentGunItem.item as? IGun ?: run {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort: held item not IGun"); return
+        }
         val gunId = iGun.getGunId(currentGunItem)
-        val gunData = GunDataAccessor.getGunData(gunId) ?: return
-
-        // 已经在换弹中
-        if (data.reloadStateType.isReloading()) return
-        // 还没有完成切枪
-        if (draw.getDrawCoolDown() != 0L) return
-        // 在拉栓
-        if (data.isBolting) return
-        // 射击冷却中不换弹（对齐官方：开火未完禁止换弹，避免射击/换弹状态机冲突）
-        // [0.6.4-REV] 已放宽：删除射击冷却拦截。QA 实测开完火/疾跑扫射按 R 换弹被冷却窗口吞掉
-        // （刚开完火失败、狂按 R 一成一败、疾跑扫射 100% 失败、等冷却走完才成功），
-        // 均源于此处 return。换弹状态机有满弹判定兜底（见下方 currentAmmo>=maxAmmo），
-        // 玩家主动按 R 即放弃继续射击，射击冷却不再拦截换弹。
+        val gunData = GunDataAccessor.getGunData(gunId) ?: run {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort: no gunData gun={}", gunId); return
+        }
 
         val currentAmmo = iGun.getCurrentAmmoCount(currentGunItem)
         val hasBulletInBarrel = iGun.hasBulletInBarrel(currentGunItem)
+        val maxAmmo = LegacyGunRefitRuntime.computeAmmoCapacity(currentGunItem).coerceAtLeast(0)
+
+        // 已经在换弹中
+        if (data.reloadStateType.isReloading()) {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} already reloading", gunId); return
+        }
+        // 还没有完成切枪
+        if (draw.getDrawCoolDown() != 0L) {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} drawCooldown={}", gunId, draw.getDrawCoolDown()); return
+        }
+        // 在拉栓
+        if (data.isBolting) {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} bolting", gunId); return
+        }
 
         // 满弹判定（考虑扩容弹夹容量）
-        val maxAmmo = LegacyGunRefitRuntime.computeAmmoCapacity(currentGunItem).coerceAtLeast(0)
         val isBarrelFull = hasBulletInBarrel || gunData.boltType == BoltType.OPEN_BOLT
-        if (currentAmmo >= maxAmmo && isBarrelFull) return
+        if (currentAmmo >= maxAmmo && isBarrelFull) {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} full ammo={} max={} barrel={}", gunId, currentAmmo, maxAmmo, hasBulletInBarrel); return
+        }
 
         val logicalSide = if (shooter.world.isRemote) Side.CLIENT else Side.SERVER
         val reloadEvent = GunReloadEvent(shooter, currentGunItem, logicalSide)
-        if (MinecraftForge.EVENT_BUS.post(reloadEvent)) return
+        if (MinecraftForge.EVENT_BUS.post(reloadEvent)) {
+            TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} event cancelled", gunId); return
+        }
 
         // 弹药来源检查
         val needCheck = !gunData.isReloadInfinite
         if (needCheck) {
             val useInventoryAmmo = iGun.useInventoryAmmo(currentGunItem)
             if (useInventoryAmmo) {
-                if (!iGun.hasInventoryAmmo(shooter, currentGunItem, needCheck)) return
+                if (!iGun.hasInventoryAmmo(shooter, currentGunItem, needCheck)) {
+                    TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} no inventory ammo", gunId); return
+                }
             } else if (iGun.useDummyAmmo(currentGunItem)) {
-                if (iGun.getDummyAmmoAmount(currentGunItem) <= 0) return
+                if (iGun.getDummyAmmoAmount(currentGunItem) <= 0) {
+                    TACZLegacy.logger.info("[ReloadDebug] reload() abort gun={} dummy ammo 0", gunId); return
+                }
             }
         }
+
+        TACZLegacy.logger.info("[ReloadDebug] {} reload() enter gun={} ammo={} barrel={} max={}", logicalSide, gunId, currentAmmo, hasBulletInBarrel, maxAmmo)
 
         if (!shooter.world.isRemote) {
             TACZNetworkHandler.sendToTrackingEntity(ServerMessageReload(shooter.entityId, currentGunItem), shooter)
@@ -87,6 +105,11 @@ public class LivingEntityReload(
         // 脚本 hook: start_reload
         val script = TACZGunScriptAPI.resolveScript(gunData)
         val startFunc = script?.let { TACZGunScriptAPI.checkFunction(it, "start_reload") }
+        TACZLegacy.logger.info(
+            "[ReloadDebug] {} reload start gun={} scriptId={} scriptResolved={} startFunc={} ammo={}",
+            logicalSide, gunId, gunData.scriptId, script != null, startFunc != null,
+            iGun.getCurrentAmmoCount(currentGunItem),
+        )
         if (startFunc != null) {
             val api = TACZGunScriptAPI.create(shooter, data, currentGunItem)
             val shouldProceed = startFunc.call(CoerceJavaToLua.coerce(api)).checkboolean()
@@ -112,20 +135,35 @@ public class LivingEntityReload(
         val gunData = GunDataAccessor.getGunData(gunId) ?: return
 
         val api = TACZGunScriptAPI.create(shooter, data, currentGunItem)
-        val result: ReloadState
-
+        val side = if (shooter.world.isRemote) Side.CLIENT else Side.SERVER
         val script = TACZGunScriptAPI.resolveScript(gunData)
-        val tickFunc = script?.let { TACZGunScriptAPI.checkFunction(it, "tick_reload") }
-        if (tickFunc != null) {
-            val varargs = tickFunc.invoke(CoerceJavaToLua.coerce(api))
-            val typeOrdinal = varargs.arg(1).checkint()
-            val countDown = varargs.arg(2).checklong()
-            result = ReloadState(
-                ReloadState.StateType.values()[typeOrdinal],
-                countDown,
-            )
+        val tickFunc = try {
+            script?.let { TACZGunScriptAPI.checkFunction(it, "tick_reload") }
+        } catch (e: Exception) {
+            TACZLegacy.logger.error("[ReloadDebug] {} checkFunction tick_reload failed gun={}", side, gunId, e)
+            null
+        }
+        val result: ReloadState = if (tickFunc != null) {
+            try {
+                val varargs = tickFunc.invoke(CoerceJavaToLua.coerce(api))
+                val typeOrdinal = varargs.arg(1).checkint()
+                val countDown = varargs.arg(2).checklong()
+                val stateType = ReloadState.StateType.values().getOrElse(typeOrdinal) { ReloadState.StateType.NOT_RELOADING }
+                TACZLegacy.logger.info(
+                    "[ReloadDebug] {} script tick gun={} state={} cd={} ammo={}",
+                    side, gunId, stateType, countDown, api.getAmmoAmount(),
+                )
+                ReloadState(stateType, countDown)
+            } catch (e: Exception) {
+                TACZLegacy.logger.error("[ReloadDebug] {} script tick_reload threw, fallback default gun={}", side, gunId, e)
+                defaultTickReload(api, gunData)
+            }
         } else {
-            result = defaultTickReload(api, gunData)
+            TACZLegacy.logger.info(
+                "[ReloadDebug] {} default tick gun={} scriptId={} scriptResolved={} ammo={}",
+                side, gunId, gunData.scriptId, script != null, api.getAmmoAmount(),
+            )
+            defaultTickReload(api, gunData)
         }
 
         data.reloadStateType = result.stateType

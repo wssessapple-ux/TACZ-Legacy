@@ -2,6 +2,7 @@ package com.tacz.legacy.common.gui
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.common.inventory.AmmoBoxContainer
+import com.tacz.legacy.common.inventory.ChunkLoaderContainer
 import com.tacz.legacy.common.inventory.GunSmithTableContainer
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.util.math.BlockPos
@@ -13,6 +14,7 @@ internal object LegacyGuiHandler : IGuiHandler {
         return when (id) {
             LegacyGuiIds.GUN_SMITH_TABLE -> GunSmithTableContainer(player.inventory, world, BlockPos(x, y, z))
             LegacyGuiIds.AMMO_BOX -> AmmoBoxContainer(player.inventory, player)
+            LegacyGuiIds.CHUNK_LOADER -> ChunkLoaderContainer(player.inventory, world, BlockPos(x, y, z))
             else -> null
         }
     }

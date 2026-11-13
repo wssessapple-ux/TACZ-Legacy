@@ -54,6 +54,7 @@ public class GunDisplayInstance {
     private boolean showCrosshair = false;
     private AmmoCountStyle ammoCountStyle = AmmoCountStyle.NORMAL;
     private @Nullable LaserConfig laserConfig;
+    private boolean playerAnimator3rdFixedHand = false;
 
     private GunDisplayInstance() {}
 
@@ -73,6 +74,7 @@ public class GunDisplayInstance {
             instance.zoomModelFov = Math.min(display.getZoomModelFov(), 70f);
             instance.showCrosshair = display.isShowCrosshair();
             instance.ammoCountStyle = display.getAmmoCountStyle();
+            instance.playerAnimator3rdFixedHand = display.is3rdFixedHand();
             return instance;
         } catch (Exception e) {
             TACZLegacy.logger.warn("Failed to create GunDisplayInstance: {}", e.getMessage());
@@ -304,6 +306,10 @@ public class GunDisplayInstance {
     @Nullable
     public LaserConfig getLaserConfig() {
         return laserConfig;
+    }
+
+    public boolean is3rdFixedHand() {
+        return playerAnimator3rdFixedHand;
     }
 
     public static final class LodModel {

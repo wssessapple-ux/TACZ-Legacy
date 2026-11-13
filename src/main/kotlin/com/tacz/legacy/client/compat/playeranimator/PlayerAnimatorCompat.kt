@@ -1,6 +1,7 @@
 package com.tacz.legacy.client.compat.playeranimator
 
 import com.tacz.legacy.common.resource.TACZRuntimeSnapshot
+import net.minecraft.client.entity.AbstractClientPlayer
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraftforge.fml.common.Loader
@@ -96,5 +97,30 @@ internal object PlayerAnimatorCompat {
     /** 枪包列表清空时释放缓存的 clip 数据（不动已挂在玩家身上的 layer）。 */
     fun clear() {
         (bridgeRef as? PlayerAnimatorBridge)?.clear()
+    }
+
+    /** 切空 / 睡觉爬梯等受限状态：清 clip 层并关掉旋转修正。 */
+    @JvmStatic
+    fun stopAllAnimation(entity: EntityLivingBase?) {
+        if (!isAvailable()) return
+        val player = entity as? AbstractClientPlayer ?: return
+        bridge()?.stopAllAnimation(player)
+    }
+
+    /** display 缺失：只关旋转修正，不动 clip 层。 */
+    @JvmStatic
+    fun stopRotationAdjustment(entity: EntityLivingBase?) {
+        if (!isAvailable()) return
+        val player = entity as? EntityPlayer ?: return
+        bridge()?.stopRotationAdjustment(player)
+    }
+
+    /** 持枪即开模型根跟随视线修正；返回当前是否可用（静态姿势路径也要据此清头偏航）。 */
+    @JvmStatic
+    fun enableRotationAdjustment(entity: EntityLivingBase?): Boolean {
+        if (!isAvailable()) return false
+        val player = entity as? EntityPlayer ?: return false
+        bridge()?.setRotationAdjustmentEnabled(player, true)
+        return true
     }
 }

@@ -11,8 +11,10 @@ import com.tacz.legacy.client.event.LegacyClientOverlayEventHandler
 import com.tacz.legacy.client.event.TACZCameraRecoilHandler
 import com.tacz.legacy.client.foundation.FocusedSmokeClientHooks
 import com.tacz.legacy.client.gui.AmmoBoxScreen
+import com.tacz.legacy.client.gui.ChunkLoaderScreen
 import com.tacz.legacy.client.gui.GunSmithTableScreen
 import com.tacz.legacy.client.input.LegacyKeyBindings
+import com.tacz.legacy.client.renderer.block.ChunkLoaderTileEntityRenderer
 import com.tacz.legacy.client.renderer.block.GunSmithTableTileEntityRenderer
 import com.tacz.legacy.client.renderer.bloom.TACZBloomBridge
 import com.tacz.legacy.client.renderer.entity.RenderDrone
@@ -21,13 +23,16 @@ import com.tacz.legacy.client.renderer.item.TACZAmmoItemRenderer
 import com.tacz.legacy.client.renderer.item.TACZAttachmentItemRenderer
 import com.tacz.legacy.client.renderer.item.TACZBlockItemRenderer
 import com.tacz.legacy.client.renderer.item.TACZGunItemRenderer
+import com.tacz.legacy.client.renderer.item.DroneItemRenderer
 import com.tacz.legacy.client.resource.TACZClientAssetManager
 import com.tacz.legacy.common.CommonProxy
+import com.tacz.legacy.common.block.entity.ChunkLoaderTileEntity
 import com.tacz.legacy.common.block.entity.GunSmithTableTileEntity
 import com.tacz.legacy.common.foundation.BootstrapDiagnostics
 import com.tacz.legacy.common.foundation.BootstrapStep
 import com.tacz.legacy.common.gui.LegacyGuiIds
 import com.tacz.legacy.common.inventory.AmmoBoxContainer
+import com.tacz.legacy.common.inventory.ChunkLoaderContainer
 import com.tacz.legacy.common.inventory.GunSmithTableContainer
 import com.tacz.legacy.common.entity.EntityDrone
 import com.tacz.legacy.common.entity.EntityKineticBullet
@@ -88,9 +93,13 @@ internal class ClientProxy : CommonProxy() {
         LegacyItems.WORKBENCH_A.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
         LegacyItems.WORKBENCH_B.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
         LegacyItems.WORKBENCH_C.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
+        LegacyItems.DRONE_CIVILIAN.setTileEntityItemStackRenderer(DroneItemRenderer)
+        LegacyItems.DRONE_MILITARY.setTileEntityItemStackRenderer(DroneItemRenderer)
 
         // World-space TESR for gun smith table / workbench blocks
         ClientRegistry.bindTileEntitySpecialRenderer(GunSmithTableTileEntity::class.java, GunSmithTableTileEntityRenderer())
+        // World-space TESR for chunk loader glowing core
+        ClientRegistry.bindTileEntitySpecialRenderer(ChunkLoaderTileEntity::class.java, ChunkLoaderTileEntityRenderer())
 
         // Load client-side assets (models, textures) from the already-loaded gun pack snapshot
         val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
@@ -105,6 +114,7 @@ internal class ClientProxy : CommonProxy() {
         return when (id) {
             LegacyGuiIds.GUN_SMITH_TABLE -> GunSmithTableScreen(GunSmithTableContainer(player.inventory, world, pos), player.inventory)
             LegacyGuiIds.AMMO_BOX -> AmmoBoxScreen(AmmoBoxContainer(player.inventory, player), player.inventory)
+            LegacyGuiIds.CHUNK_LOADER -> ChunkLoaderScreen(ChunkLoaderContainer(player.inventory, world, pos), player.inventory)
             else -> null
         }
     }

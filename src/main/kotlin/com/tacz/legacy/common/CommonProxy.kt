@@ -2,6 +2,7 @@ package com.tacz.legacy.common
 
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.common.block.entity.LegacyBlockEntities
+import com.tacz.legacy.common.event.ChunkLoaderTicketCallback
 import com.tacz.legacy.common.event.ChunkUnloadHandler
 import com.tacz.legacy.common.event.LegacyMissingMappingHandler
 import com.tacz.legacy.common.event.PreventGunLeftClickHandler
@@ -15,6 +16,7 @@ import com.tacz.legacy.common.registry.SoundRegisterer
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
+import net.minecraftforge.common.ForgeChunkManager
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.fml.common.network.NetworkRegistry
 
@@ -32,6 +34,7 @@ internal open class CommonProxy {
     }
 
     internal open fun preInit(): Unit {
+        ForgeChunkManager.setForcedChunkLoadingCallback(TACZLegacy, ChunkLoaderTicketCallback)
         LegacyBlockEntities.registerAll()
         TACZNetworkHandler.init()
         NetworkRegistry.INSTANCE.registerGuiHandler(TACZLegacy, LegacyGuiHandler)

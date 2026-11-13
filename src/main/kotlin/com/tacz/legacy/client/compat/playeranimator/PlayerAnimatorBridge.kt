@@ -5,6 +5,7 @@ import com.google.gson.JsonParser
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.IGunOperator
 import com.tacz.legacy.api.item.IGun
+import com.tacz.legacy.client.compat.playeranimator.animation.RotationAdjustmentModifier
 import com.tacz.legacy.client.resource.TACZClientAssetManager
 import com.tacz.legacy.common.resource.TACZGunPackPresentation
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
@@ -67,6 +68,7 @@ internal class PlayerAnimatorBridge {
         val lower: ModifierLayer<KeyframeAnimationPlayer>,
         val loopUpper: ModifierLayer<KeyframeAnimationPlayer>,
         val onceUpper: ModifierLayer<KeyframeAnimationPlayer>,
+        val rotation: ModifierLayer<KeyframeAnimationPlayer>,
     ) {
         var lowerClip: String? = null
         var loopUpperClip: String? = null
@@ -291,6 +293,23 @@ internal class PlayerAnimatorBridge {
         return animation.isActive
     }
 
+    /** 持枪时打开模型根跟随视线修正；无动画的枪走静态姿势也要开。 */
+    fun setRotationAdjustmentEnabled(player: EntityPlayer, enabled: Boolean) {
+        RotationAdjustmentModifier.setEnabled(player, enabled)
+    }
+
+    /** 只关修正层，不清 clip 层。 */
+    fun stopRotationAdjustment(player: EntityPlayer) {
+        RotationAdjustmentModifier.setEnabled(player, false, "no-display")
+    }
+
+    /** 切空 / 睡觉爬梯等场景：清掉三层 clip 并关掉修正层。 */
+    fun stopAllAnimation(player: AbstractClientPlayer) {
+        RotationAdjustmentModifier.setEnabled(player, false, "stop-all")
+        val layer = layers[player.uniqueID] ?: return
+        fadeOut(layer)
+    }
+
     fun onShoot(player: EntityPlayer?) {
         val clientPlayer = player as? AbstractClientPlayer ?: return
         val layer = layerFor(clientPlayer) ?: return
@@ -336,6 +355,9 @@ internal class PlayerAnimatorBridge {
             PlayerAnimationFactory.ANIMATION_DATA_FACTORY.registerFactory(ID_ONCE_UPPER, 2) { player ->
                 createState(player).onceUpper
             }
+            PlayerAnimationFactory.ANIMATION_DATA_FACTORY.registerFactory(ID_ROTATION, 3) { player ->
+                createState(player).rotation
+            }
         } catch (throwable: Throwable) {
             TACZLegacy.logger.warn(marker, "Failed to register animation factories: {}", throwable.toString())
         }
@@ -347,6 +369,7 @@ internal class PlayerAnimatorBridge {
             ModifierLayer(),
             ModifierLayer(),
             ModifierLayer(),
+            ModifierLayer(null, RotationAdjustmentModifier.get(player)),
         )
         // 左手玩家需要镜像，库不会自动挂
         state.lower.addModifierLast(LeftHandedHelperModifier(player))
@@ -371,6 +394,7 @@ internal class PlayerAnimatorBridge {
         stack.addAnimLayer(0, state.lower)
         stack.addAnimLayer(1, state.loopUpper)
         stack.addAnimLayer(2, state.onceUpper)
+        stack.addAnimLayer(3, state.rotation)
         return state
     }
 
@@ -537,6 +561,7 @@ internal class PlayerAnimatorBridge {
         private val ID_LOWER = ResourceLocation("tacz_legacy", "lower_animation")
         private val ID_LOOP_UPPER = ResourceLocation("tacz_legacy", "loop_upper_animation")
         private val ID_ONCE_UPPER = ResourceLocation("tacz_legacy", "once_upper_animation")
+        private val ID_ROTATION = ResourceLocation("tacz_legacy", "rotation")
 
         /** 上游用 8 tick，动作之间过渡更柔 */
         private const val FADE_LOOP = 8

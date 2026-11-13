@@ -37,6 +37,7 @@ public object TACZNetworkHandler {
         registerC2S<ClientMessagePlayerMelee>()
         registerC2S<ClientMessagePlayerFireSelect>()
         registerC2S<ClientMessageSyncBaseTimestamp>()
+        registerC2S<ClientMessageChunkLoaderCycle>()
 
         // Server -> Client (events)
         registerS2C(ServerMessageGunShoot.Handler::class.java, ServerMessageGunShoot::class.java)

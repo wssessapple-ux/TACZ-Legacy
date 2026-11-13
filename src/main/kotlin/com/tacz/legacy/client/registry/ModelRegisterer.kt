@@ -27,6 +27,8 @@ internal object ModelRegisterer {
         LegacyItems.WORKBENCH_A,
         LegacyItems.WORKBENCH_B,
         LegacyItems.WORKBENCH_C,
+        LegacyItems.DRONE_CIVILIAN,
+        LegacyItems.DRONE_MILITARY,
     )
 
     @SubscribeEvent

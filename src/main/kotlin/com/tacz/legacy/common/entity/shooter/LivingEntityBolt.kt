@@ -1,5 +1,6 @@
 package com.tacz.legacy.common.entity.shooter
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.common.resource.BoltType
 import com.tacz.legacy.common.resource.GunCombatData
@@ -29,17 +30,26 @@ public class LivingEntityBolt(
         // 过滤：开膛/闭膛枪不需要手动拉栓
         if (gunData.boltType != BoltType.MANUAL_ACTION) return
         // 已有膛内弹
-        if (iGun.hasBulletInBarrel(currentGunItem)) return
+        if (iGun.hasBulletInBarrel(currentGunItem)) {
+            TACZLegacy.logger.info("[ReloadDebug] bolt() abort gun={} barrel has ammo", gunId); return
+        }
         // 没弹药可上
-        if (iGun.getCurrentAmmoCount(currentGunItem) <= 0) return
+        if (iGun.getCurrentAmmoCount(currentGunItem) <= 0) {
+            TACZLegacy.logger.info("[ReloadDebug] bolt() abort gun={} magazine empty", gunId); return
+        }
         // 正在换弹
-        if (data.reloadStateType.isReloading()) return
+        if (data.reloadStateType.isReloading()) {
+            TACZLegacy.logger.info("[ReloadDebug] bolt() abort gun={} reloading", gunId); return
+        }
         // 正在切枪
-        if (draw.getDrawCoolDown() != 0L) return
+        if (draw.getDrawCoolDown() != 0L) {
+            TACZLegacy.logger.info("[ReloadDebug] bolt() abort gun={} drawCooldown={}", gunId, draw.getDrawCoolDown()); return
+        }
         // 已在拉栓
         if (data.isBolting) return
 
         data.boltTimestamp = System.currentTimeMillis()
+        TACZLegacy.logger.info("[ReloadDebug] bolt() start gun={} ammo={}", gunId, iGun.getCurrentAmmoCount(currentGunItem))
 
         // 脚本 hook: start_bolt → 返回 boolean（是否开始拉栓）
         val script = TACZGunScriptAPI.resolveScript(gunData)
@@ -47,8 +57,10 @@ public class LivingEntityBolt(
         if (startFunc != null) {
             val api = TACZGunScriptAPI.create(shooter, data, currentGunItem)
             data.isBolting = startFunc.call(CoerceJavaToLua.coerce(api)).checkboolean()
+            TACZLegacy.logger.info("[ReloadDebug] bolt() start_bolt gun={} isBolting={}", gunId, data.isBolting)
         } else {
             data.isBolting = true
+            TACZLegacy.logger.info("[ReloadDebug] bolt() no script gun={} isBolting=true", gunId)
         }
     }
 
@@ -66,10 +78,23 @@ public class LivingEntityBolt(
         val api = TACZGunScriptAPI.create(shooter, data, currentGunItem)
 
         val script = TACZGunScriptAPI.resolveScript(gunData)
-        val tickFunc = script?.let { TACZGunScriptAPI.checkFunction(it, "tick_bolt") }
+        val tickFunc = try {
+            script?.let { TACZGunScriptAPI.checkFunction(it, "tick_bolt") }
+        } catch (e: Exception) {
+            TACZLegacy.logger.error("[ReloadDebug] checkFunction tick_bolt failed gun={}", gunId, e)
+            null
+        }
         data.isBolting = if (tickFunc != null) {
-            tickFunc.call(CoerceJavaToLua.coerce(api)).checkboolean()
+            try {
+                val bolting = tickFunc.call(CoerceJavaToLua.coerce(api)).checkboolean()
+                TACZLegacy.logger.info("[ReloadDebug] script tick_bolt gun={} bolting={} ammo={} barrel={}", gunId, bolting, api.getAmmoAmount(), api.hasAmmoInBarrel())
+                bolting
+            } catch (e: Exception) {
+                TACZLegacy.logger.error("[ReloadDebug] tick_bolt threw, fallback default gun={}", gunId, e)
+                defaultTickBolt(api, gunData)
+            }
         } else {
+            TACZLegacy.logger.info("[ReloadDebug] default tick_bolt gun={} ammo={} barrel={}", gunId, api.getAmmoAmount(), api.hasAmmoInBarrel())
             defaultTickBolt(api, gunData)
         }
     }

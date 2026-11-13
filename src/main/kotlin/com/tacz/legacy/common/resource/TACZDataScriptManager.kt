@@ -1,5 +1,6 @@
 package com.tacz.legacy.common.resource
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.ReloadState
 import com.tacz.legacy.api.item.gun.FireMode
 import net.minecraft.util.ResourceLocation
@@ -33,9 +34,13 @@ internal object TACZDataScriptManager {
             return null
         }
         val g = ensureGlobals(snapshot)
-        val chunk = g.load(StringReader(source), scriptId.toString())
-        val result = chunk.call()
-        val table = if (result is LuaTable) result else null
+        val table = try {
+            val result = g.load(StringReader(source), scriptId.toString()).call()
+            if (result is LuaTable) result else null
+        } catch (e: Exception) {
+            TACZLegacy.logger.error("[ReloadDebug] Data script {} failed to load, falling back to default logic", scriptId, e)
+            null
+        }
         scriptCache[scriptId] = table
         return table
     }

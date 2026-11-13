@@ -1,0 +1,48 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "side": "tacz:block/chunk_loader_side",
+    "top": "tacz:block/chunk_loader_top",
+    "bottom": "tacz:block/chunk_loader_bottom",
+    "particle": "tacz:block/chunk_loader_side"
+  },
+  "elements": [
+    {
+      "__comment": "主体外壳",
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down":  { "uv": [0, 0, 32, 32], "texture": "#bottom", "cullface": "down" },
+        "up":    { "uv": [0, 0, 32, 32], "texture": "#top", "cullface": "up" },
+        "north": { "uv": [0, 0, 32, 32], "texture": "#side", "cullface": "north" },
+        "south": { "uv": [0, 0, 32, 32], "texture": "#side", "cullface": "south" },
+        "west":  { "uv": [0, 0, 32, 32], "texture": "#side", "cullface": "west" },
+        "east":  { "uv": [0, 0, 32, 32], "texture": "#side", "cullface": "east" }
+      }
+    },
+    {
+      "__comment": "顶部盖板",
+      "from": [2, 15, 2],
+      "to": [14, 16, 14],
+      "faces": {
+        "up":    { "uv": [4, 4, 28, 28], "texture": "#top" },
+        "north": { "uv": [4, 28, 28, 32], "texture": "#side" },
+        "south": { "uv": [4, 28, 28, 32], "texture": "#side" },
+        "west":  { "uv": [4, 28, 28, 32], "texture": "#side" },
+        "east":  { "uv": [4, 28, 28, 32], "texture": "#side" }
+      }
+    },
+    {
+      "__comment": "底部底脚",
+      "from": [1, 0, 1],
+      "to": [15, 1, 15],
+      "faces": {
+        "down":  { "uv": [2, 2, 30, 30], "texture": "#bottom", "cullface": "down" },
+        "north": { "uv": [2, 0, 30, 2], "texture": "#side" },
+        "south": { "uv": [2, 0, 30, 2], "texture": "#side" },
+        "west":  { "uv": [2, 0, 30, 2], "texture": "#side" },
+        "east":  { "uv": [2, 0, 30, 2], "texture": "#side" }
+      }
+    }
+  ]
+}

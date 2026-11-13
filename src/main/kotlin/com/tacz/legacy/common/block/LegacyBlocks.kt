@@ -3,6 +3,7 @@
 package com.tacz.legacy.common.block
 
 import com.tacz.legacy.TACZLegacy
+import com.tacz.legacy.common.block.entity.ChunkLoaderTileEntity
 import com.tacz.legacy.common.block.entity.GunSmithTableTileEntity
 import com.tacz.legacy.common.block.entity.StatueTileEntity
 import com.tacz.legacy.common.block.entity.TargetTileEntity
@@ -13,7 +14,9 @@ import net.minecraft.block.BlockContainer
 import net.minecraft.block.SoundType
 import net.minecraft.block.material.Material
 import net.minecraft.block.state.IBlockState
+import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
+import net.minecraft.item.ItemStack
 import net.minecraft.init.SoundEvents
 import net.minecraft.inventory.InventoryHelper
 import net.minecraft.tileentity.TileEntity
@@ -23,6 +26,7 @@ import net.minecraft.util.EnumHand
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.SoundCategory
 import net.minecraft.util.math.BlockPos
+import net.minecraft.world.IBlockAccess
 import net.minecraft.world.World
 import net.minecraftforge.registries.IForgeRegistry
 import java.util.Random
@@ -34,6 +38,7 @@ internal object LegacyBlocks {
     internal val WORKBENCH_C: LegacyGunSmithTableBlock = LegacyGunSmithTableBlock("workbench_c")
     internal val TARGET: LegacyTargetBlock = LegacyTargetBlock("target")
     internal val STATUE: LegacyStatueBlock = LegacyStatueBlock("statue")
+    internal val CHUNK_LOADER: LegacyChunkLoaderBlock = LegacyChunkLoaderBlock("chunk_loader")
 
     internal val allBlocks: List<BlockContainer> = listOf(
         GUN_SMITH_TABLE,
@@ -42,6 +47,7 @@ internal object LegacyBlocks {
         WORKBENCH_C,
         TARGET,
         STATUE,
+        CHUNK_LOADER,
     )
 
     internal fun registerAll(registry: IForgeRegistry<net.minecraft.block.Block>): Unit {
@@ -194,6 +200,67 @@ internal class LegacyStatueBlock(path: String) : LegacyBaseBlock(path, Material.
             InventoryHelper.spawnItemStack(worldIn, pos.x + 0.5, pos.y + 1.0, pos.z + 0.5, tile.storedItem.copy())
             tile.clear()
         }
+        super.breakBlock(worldIn, pos, state)
+    }
+}
+
+internal class LegacyChunkLoaderBlock(path: String) : LegacyBaseBlock(path, Material.ROCK, SoundType.STONE) {
+    init {
+        setHardness(3.0f)
+        setResistance(6.0f)
+    }
+
+    override fun createNewTileEntity(worldIn: World, meta: Int): TileEntity = ChunkLoaderTileEntity()
+
+    override fun onBlockPlacedBy(
+        worldIn: World,
+        pos: BlockPos,
+        state: IBlockState,
+        placer: EntityLivingBase,
+        stack: ItemStack,
+    ) {
+        super.onBlockPlacedBy(worldIn, pos, state, placer, stack)
+        if (!worldIn.isRemote && placer is EntityPlayer) {
+            (worldIn.getTileEntity(pos) as? ChunkLoaderTileEntity)?.let {
+                it.owner = placer.name
+                it.markDirty()
+            }
+        }
+    }
+
+    override fun onBlockActivated(
+        worldIn: World,
+        pos: BlockPos,
+        state: IBlockState,
+        playerIn: EntityPlayer,
+        hand: EnumHand,
+        facing: EnumFacing,
+        hitX: Float,
+        hitY: Float,
+        hitZ: Float,
+    ): Boolean {
+        if (worldIn.isRemote) {
+            return true
+        }
+        if (worldIn.getTileEntity(pos) !is ChunkLoaderTileEntity) {
+            return true
+        }
+        playerIn.openGui(TACZLegacy, LegacyGuiIds.CHUNK_LOADER, worldIn, pos.x, pos.y, pos.z)
+        return true
+    }
+
+    override fun onBlockAdded(worldIn: World, pos: BlockPos, state: IBlockState) {
+        super.onBlockAdded(worldIn, pos, state)
+        (worldIn.getTileEntity(pos) as? ChunkLoaderTileEntity)?.refresh()
+    }
+
+    override fun onNeighborChange(world: IBlockAccess, pos: BlockPos, neighbor: BlockPos) {
+        val worldIn = world as? World ?: return
+        (worldIn.getTileEntity(pos) as? ChunkLoaderTileEntity)?.refresh()
+    }
+
+    override fun breakBlock(worldIn: World, pos: BlockPos, state: IBlockState) {
+        (worldIn.getTileEntity(pos) as? ChunkLoaderTileEntity)?.onBroken()
         super.breakBlock(worldIn, pos, state)
     }
 }

@@ -1,113 +1,125 @@
 package com.tacz.legacy.client.renderer.entity
 
+import com.google.gson.GsonBuilder
+import com.google.gson.stream.JsonReader
+import com.tacz.legacy.TACZLegacy
+import com.tacz.legacy.client.model.bedrock.BedrockModel
+import com.tacz.legacy.client.resource.pojo.model.BedrockModelPOJO
+import com.tacz.legacy.client.resource.pojo.model.BedrockVersion
+import com.tacz.legacy.client.resource.pojo.model.CubesItem
 import com.tacz.legacy.common.entity.EntityDrone
-import net.minecraft.client.renderer.BufferBuilder
+import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GlStateManager
-import net.minecraft.client.renderer.Tessellator
 import net.minecraft.client.renderer.entity.Render
 import net.minecraft.client.renderer.entity.RenderManager
 import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats
 import net.minecraft.util.ResourceLocation
 import net.minecraftforge.fml.relauncher.Side
 import net.minecraftforge.fml.relauncher.SideOnly
+import java.io.StringReader
+import java.nio.charset.StandardCharsets
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 /**
- * 无人机实体渲染器。
+ * 无人机实体渲染器（路线 B：内置 bedrock 模型 + 实体 UV 贴图）。
  *
- * 简单的彩色小立方体：民用灰色、军用红色，
- * 顶部加一个旋转的薄片表示螺旋桨。
+ * 模型随 mod classloader 打包在 assets/tacz/models/bedrock/drone.json，
+ * 民用/军用各绑一张实体贴图；四旋翼为独立骨，按 tick 绕 Y 轴旋转。
+ * 整体仍按飞行方向（motion）朝向目标。
  */
 @SideOnly(Side.CLIENT)
 internal class RenderDrone(renderManager: RenderManager) : Render<EntityDrone>(renderManager) {
 
-    override fun doRender(entity: EntityDrone, x: Double, y: Double, z: Double, entityYaw: Float, partialTicks: Float) {
+    companion object {
+        private const val MODEL_PATH = "assets/${TACZLegacy.MOD_ID}/models/bedrock/drone.json"
+
+        private val civilianTexture = ResourceLocation(TACZLegacy.MOD_ID, "textures/entity/drone_civilian.png")
+        private val militaryTexture = ResourceLocation(TACZLegacy.MOD_ID, "textures/entity/drone_military.png")
+
+        private val internalModelGson = GsonBuilder()
+            .registerTypeAdapter(CubesItem::class.java, CubesItem.Deserializer())
+            .create()
+
+        private var model: BedrockModel? = null
+        private var modelResolved = false
+    }
+
+    override fun doRender(
+        entity: EntityDrone,
+        x: Double,
+        y: Double,
+        z: Double,
+        entityYaw: Float,
+        partialTicks: Float,
+    ) {
+        val droneModel = resolveModel() ?: return
         val military = entity.isMilitary
-        val r: Float
-        val g: Float
-        val b: Float
-        if (military) {
-            r = 0.75f; g = 0.18f; b = 0.15f
-        } else {
-            r = 0.45f; g = 0.48f; b = 0.52f
-        }
+        val texture = if (military) militaryTexture else civilianTexture
+        Minecraft.getMinecraft().textureManager.bindTexture(texture)
+
+        val mx = entity.motionX.toFloat()
+        val my = entity.motionY.toFloat()
+        val mz = entity.motionZ.toFloat()
+        val hDist = sqrt(mx * mx + mz * mz)
 
         GlStateManager.pushMatrix()
-        GlStateManager.translate(x.toDouble(), y.toDouble(), z.toDouble())
-        GlStateManager.disableTexture2D()
+        GlStateManager.translate(x, y, z)
+
+        // 按飞行方向朝向目标
+        if (hDist > 1.0E-4f) {
+            val yaw = Math.toDegrees(atan2(mx, mz).toDouble()).toFloat()
+            val pitch = -Math.toDegrees(atan2(my, hDist).toDouble()).toFloat()
+            GlStateManager.rotate(yaw, 0f, 1f, 0f)
+            GlStateManager.rotate(pitch, 1f, 0f, 0f)
+        }
+
+        // 与子弹模型一致的 bedrock 模型变换三明治
+        GlStateManager.translate(0.0f, 1.5f, 0.0f)
+        GlStateManager.scale(-1.0f, -1.0f, 1.0f)
+        GlStateManager.enableLighting()
+        GlStateManager.enableRescaleNormal()
         GlStateManager.enableBlend()
         GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0)
-        GlStateManager.disableLighting()
 
-        // 机身：0.4 边长的立方体
-        val half = 0.2f
-        drawCube(half, r, g, b, 1.0f)
+        // 旋翼旋转（对侧反向）
+        val tickTime = entity.ticksExisted + partialTicks
+        val angle = (tickTime * 0.6) % (2.0 * Math.PI)
+        droneModel.getNode("rotor_fl")?.let { it.yRot = angle.toFloat() }
+        droneModel.getNode("rotor_fr")?.let { it.yRot = -angle.toFloat() }
+        droneModel.getNode("rotor_bl")?.let { it.yRot = -angle.toFloat() }
+        droneModel.getNode("rotor_br")?.let { it.yRot = angle.toFloat() }
 
-        // 螺旋桨：旋转的水平薄片
-        val spin = (entity.ticksExisted + partialTicks) * 0.8f
-        GlStateManager.rotate(spin, 0.0f, 1.0f, 0.0f)
-        drawPropeller(0.28f)
+        droneModel.render()
 
-        GlStateManager.enableLighting()
         GlStateManager.disableBlend()
-        GlStateManager.enableTexture2D()
-        GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f)
+        GlStateManager.disableRescaleNormal()
         GlStateManager.popMatrix()
     }
 
-    private fun drawCube(half: Float, r: Float, g: Float, b: Float, a: Float) {
-        val tessellator = Tessellator.getInstance()
-        val buffer = tessellator.buffer
-        buffer.begin(7, DefaultVertexFormats.POSITION_COLOR)
-
-        // 上下
-        buffer.pos(-half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-
-        buffer.pos(-half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-
-        // 北南
-        buffer.pos(-half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-
-        buffer.pos(-half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-
-        // 西东
-        buffer.pos(-half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(-half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-
-        buffer.pos(half.toDouble(), -half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), -half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-        buffer.pos(half.toDouble(), -half.toDouble(), half.toDouble()).color(r, g, b, a).endVertex()
-
-        tessellator.draw()
-    }
-
-    private fun drawPropeller(blade: Float) {
-        val tessellator = Tessellator.getInstance()
-        val buffer = tessellator.buffer
-        buffer.begin(7, DefaultVertexFormats.POSITION_COLOR)
-        val y = 0.24
-        val dark = 0.2f
-        // 十字薄片
-        buffer.pos(-blade.toDouble(), y.toDouble(), 0.0).color(dark, dark, dark, 0.85f).endVertex()
-        buffer.pos(blade.toDouble(), y.toDouble(), 0.0).color(dark, dark, dark, 0.85f).endVertex()
-        buffer.pos(0.0, y.toDouble(), blade.toDouble()).color(dark, dark, dark, 0.85f).endVertex()
-        buffer.pos(0.0, y.toDouble(), -blade.toDouble()).color(dark, dark, dark, 0.85f).endVertex()
-        tessellator.draw()
+    private fun resolveModel(): BedrockModel? {
+        if (modelResolved) {
+            return model
+        }
+        modelResolved = true
+        val json = RenderDrone::class.java.classLoader
+            .getResourceAsStream(MODEL_PATH)
+            ?.bufferedReader(StandardCharsets.UTF_8)
+            ?.use { it.readText() }
+        if (json == null) {
+            TACZLegacy.logger.warn("[RenderDrone] Failed to open bundled drone model: {}", MODEL_PATH)
+            return null
+        }
+        return runCatching {
+            val reader = JsonReader(StringReader(json))
+            reader.isLenient = true
+            val pojo = internalModelGson.fromJson<BedrockModelPOJO>(reader, BedrockModelPOJO::class.java)
+            val version = BedrockVersion.fromPojo(pojo)
+                ?: error("unknown bedrock format version ${pojo.formatVersion}")
+            BedrockModel(pojo, version)
+        }.onFailure { error ->
+            TACZLegacy.logger.warn("[RenderDrone] Failed to parse bundled drone model: {}", error.message)
+        }.getOrNull().also { model = it }
     }
 
     override fun getEntityTexture(entity: EntityDrone): ResourceLocation = TextureMap.LOCATION_MISSING_TEXTURE

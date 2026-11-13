@@ -19,6 +19,7 @@ import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
 import com.tacz.legacy.common.registry.LegacyCreativeTabs
 import com.tacz.legacy.common.gui.LegacyGuiIds
 import net.minecraft.block.state.IBlockState
+import net.minecraft.client.resources.I18n
 import net.minecraft.client.util.ITooltipFlag
 import net.minecraft.creativetab.CreativeTabs
 import net.minecraft.entity.EntityLivingBase
@@ -34,6 +35,7 @@ import net.minecraft.util.EnumHand
 import net.minecraft.util.NonNullList
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.text.TextComponentTranslation
 import net.minecraft.util.text.TextFormatting
 import net.minecraftforge.items.CapabilityItemHandler
 import net.minecraftforge.items.IItemHandler
@@ -57,6 +59,7 @@ internal object LegacyItems {
     internal val WORKBENCH_C: LegacyBlockItem = createBlockItem(LegacyBlocks.WORKBENCH_C)
     internal val TARGET: LegacyBlockItem = createBlockItem(LegacyBlocks.TARGET)
     internal val STATUE: LegacyBlockItem = createBlockItem(LegacyBlocks.STATUE)
+    internal val CHUNK_LOADER: ChunkLoaderBlockItem = ChunkLoaderBlockItem(LegacyBlocks.CHUNK_LOADER)
 
     internal val allItems: List<Item> = listOf(
         MODERN_KINETIC_GUN,
@@ -72,6 +75,7 @@ internal object LegacyItems {
         WORKBENCH_C,
         TARGET,
         STATUE,
+        CHUNK_LOADER,
     )
 
     internal fun registerAll(registry: IForgeRegistry<Item>): Unit {
@@ -733,7 +737,7 @@ internal class ModernKineticGunItem : Item(), IGun {
     }
 }
 
-internal class LegacyBlockItem(block: net.minecraft.block.Block) : ItemBlock(block) {
+internal open class LegacyBlockItem(block: net.minecraft.block.Block) : ItemBlock(block) {
     init {
         maxStackSize = 1
     }
@@ -832,6 +836,25 @@ internal class LegacyBlockItem(block: net.minecraft.block.Block) : ItemBlock(blo
     }
 }
 
+/**
+ * 区块加载器物品：提示栏走本地化语言键，按客户端游戏语言显示。
+ */
+internal class ChunkLoaderBlockItem(block: net.minecraft.block.Block) : LegacyBlockItem(block) {
+    init {
+        registryName = requireNotNull(block.registryName)
+        setTranslationKey("${TACZLegacy.MOD_ID}.${requireNotNull(block.registryName).path}")
+        setCreativeTab(LegacyCreativeTabs.DECORATION)
+    }
+
+    @SideOnly(Side.CLIENT)
+    override fun addInformation(stack: ItemStack, worldIn: World?, tooltip: MutableList<String>, flagIn: ITooltipFlag) {
+        super.addInformation(stack, worldIn, tooltip, flagIn)
+        tooltip += "${TextFormatting.GRAY}${I18n.format("tooltip.tacz.chunk_loader.desc")}"
+        tooltip += "${TextFormatting.GRAY}${TextFormatting.ITALIC}${I18n.format("tooltip.tacz.chunk_loader.usage")}"
+        tooltip += "${TextFormatting.DARK_AQUA}${I18n.format("tooltip.tacz.chunk_loader.trait")}"
+    }
+}
+
 private fun ensureTag(stack: ItemStack): NBTTagCompound {
     val existing = stack.tagCompound
     if (existing != null) {
@@ -882,6 +905,17 @@ internal open class DroneItem(private val isMilitary: Boolean) : Item() {
         maxStackSize = 16
     }
 
+    @SideOnly(Side.CLIENT)
+    override fun addInformation(stack: ItemStack, worldIn: World?, tooltip: MutableList<String>, flagIn: ITooltipFlag) {
+        val descKey = if (isMilitary) "tooltip.tacz.drone_military.desc" else "tooltip.tacz.drone_civilian.desc"
+        val traitKey = if (isMilitary) "tooltip.tacz.drone_military.trait" else "tooltip.tacz.drone_civilian.trait"
+        val warningKey = if (isMilitary) "tooltip.tacz.drone_military.warning" else "tooltip.tacz.drone_civilian.warning"
+        tooltip += "${TextFormatting.GRAY}${I18n.format(descKey)}"
+        tooltip += "${TextFormatting.GRAY}${TextFormatting.ITALIC}${I18n.format("tooltip.tacz.drone.usage")}"
+        tooltip += "${TextFormatting.DARK_AQUA}${I18n.format(traitKey)}"
+        tooltip += "${TextFormatting.RED}${I18n.format(warningKey)}"
+    }
+
     override fun onItemRightClick(worldIn: World, playerIn: EntityPlayer, handIn: EnumHand): ActionResult<ItemStack> {
         val stack = playerIn.getHeldItem(handIn)
         if (worldIn.isRemote) {
@@ -899,7 +933,7 @@ internal open class DroneItem(private val isMilitary: Boolean) : Item() {
 
             ensureTag(stack).setInteger("TargetId", target.entityId)
             playerIn.sendMessage(
-                net.minecraft.util.text.TextComponentString("§a已锁定：${target.name}，右键发射，潜行+右键取消")
+                TextComponentTranslation("message.tacz.drone.locked", target.name)
             )
             return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
         }
@@ -908,7 +942,7 @@ internal open class DroneItem(private val isMilitary: Boolean) : Item() {
         if (playerIn.isSneaking) {
             // 潜行+右键：取消锁定
             stack.tagCompound?.removeTag("TargetId")
-            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§7已取消锁定"))
+            playerIn.sendMessage(TextComponentTranslation("message.tacz.drone.cancelled"))
             return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
         }
 
@@ -916,13 +950,13 @@ internal open class DroneItem(private val isMilitary: Boolean) : Item() {
         val target = worldIn.getEntityByID(targetId)
         if (target == null || !target.isEntityAlive || target !is EntityLivingBase) {
             stack.tagCompound?.removeTag("TargetId")
-            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§c目标已失效，锁定已清除"))
+            playerIn.sendMessage(TextComponentTranslation("message.tacz.drone.invalid"))
             return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
         }
 
         if (target.dimension != playerIn.dimension) {
             stack.tagCompound?.removeTag("TargetId")
-            playerIn.sendMessage(net.minecraft.util.text.TextComponentString("§c目标不在当前维度，锁定已清除"))
+            playerIn.sendMessage(TextComponentTranslation("message.tacz.drone.wrong_dimension"))
             return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
         }
 

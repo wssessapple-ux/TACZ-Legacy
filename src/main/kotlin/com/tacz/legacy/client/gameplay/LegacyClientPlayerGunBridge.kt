@@ -146,6 +146,7 @@ internal object LegacyClientPlayerGunBridge {
         while (LegacyKeyBindings.RELOAD.isPressed) {
             val stack = player.heldItemMainhand
             val iGun = stack.item as? IGun ?: continue
+            TACZLegacy.logger.info("[ReloadDebug] CLIENT R pressed gun={} ammo={}", iGun.getGunId(stack), iGun.getCurrentAmmoCount(stack))
             // 移除 useInventoryAmmo 拦截：背包供弹（inventory/fuel）的枪按 R 也能正常触发换弹，
             // 否则这类枪换弹被直接跳过（bug2"换弹几乎失效"）。
             val before = operator.getSynReloadState().stateType
