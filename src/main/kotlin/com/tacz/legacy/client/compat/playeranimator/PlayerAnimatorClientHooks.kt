@@ -1,5 +1,6 @@
 package com.tacz.legacy.client.compat.playeranimator
 
+import com.tacz.legacy.api.event.GunShootEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 
@@ -18,5 +19,11 @@ internal object PlayerAnimatorClientHooks {
             return
         }
         PlayerAnimatorCompat.onClientTick()
+    }
+
+    @JvmStatic
+    @SubscribeEvent
+    fun onGunShoot(event: GunShootEvent) {
+        PlayerAnimatorCompat.onGunShoot(event)
     }
 }

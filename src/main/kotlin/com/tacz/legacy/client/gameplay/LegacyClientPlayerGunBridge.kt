@@ -8,6 +8,7 @@ import com.tacz.legacy.api.item.gun.FireMode
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.client.animation.statemachine.GunAnimationConstant
 import com.tacz.legacy.client.compat.playeranimator.PlayerAnimatorCompat
+import com.tacz.legacy.client.fpv.FpvController
 import com.tacz.legacy.client.gui.GunRefitScreen
 import com.tacz.legacy.client.input.LegacyInputExtraCheck
 import com.tacz.legacy.client.input.LegacyKeyBindings
@@ -68,6 +69,15 @@ internal object LegacyClientPlayerGunBridge {
                 setAimState(operator, false)
             }
             operator.tick()
+            return
+        }
+
+        // FPV 遥控期间锁定宿主本体：跳过瞄准/换弹/开火/近战/交互等全部枪械输入，
+        // 输入只映射给无人机；若正处于瞄准态则退出瞄准。
+        if (FpvController.isActive) {
+            if (operator.getSynIsAiming()) setAimState(operator, false)
+            operator.tick()
+            LegacyClientGunAnimationDriver.tickLoopAnimation(player)
             return
         }
 

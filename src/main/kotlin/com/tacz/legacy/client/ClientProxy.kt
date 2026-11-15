@@ -10,6 +10,7 @@ import com.tacz.legacy.client.event.LegacyClientInputEventHandler
 import com.tacz.legacy.client.event.LegacyClientOverlayEventHandler
 import com.tacz.legacy.client.event.TACZCameraRecoilHandler
 import com.tacz.legacy.client.foundation.FocusedSmokeClientHooks
+import com.tacz.legacy.client.fpv.FpvClientHandler
 import com.tacz.legacy.client.gui.AmmoBoxScreen
 import com.tacz.legacy.client.gui.ChunkLoaderScreen
 import com.tacz.legacy.client.gui.GunSmithTableScreen
@@ -18,6 +19,7 @@ import com.tacz.legacy.client.renderer.block.ChunkLoaderTileEntityRenderer
 import com.tacz.legacy.client.renderer.block.GunSmithTableTileEntityRenderer
 import com.tacz.legacy.client.renderer.bloom.TACZBloomBridge
 import com.tacz.legacy.client.renderer.entity.RenderDrone
+import com.tacz.legacy.client.renderer.entity.RenderFpvDrone
 import com.tacz.legacy.client.renderer.entity.RenderKineticBullet
 import com.tacz.legacy.client.renderer.item.TACZAmmoItemRenderer
 import com.tacz.legacy.client.renderer.item.TACZAttachmentItemRenderer
@@ -35,11 +37,14 @@ import com.tacz.legacy.common.inventory.AmmoBoxContainer
 import com.tacz.legacy.common.inventory.ChunkLoaderContainer
 import com.tacz.legacy.common.inventory.GunSmithTableContainer
 import com.tacz.legacy.common.entity.EntityDrone
+import com.tacz.legacy.common.entity.EntityFpvDrone
 import com.tacz.legacy.common.entity.EntityKineticBullet
 import com.tacz.legacy.common.item.LegacyItems
 import com.tacz.legacy.client.particle.LegacyParticleFactoryRegistry
 import com.tacz.legacy.client.registry.ModelRegisterer
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
+import com.tacz.legacy.common.resource.TACZGunPackPresentation
+import net.minecraft.client.Minecraft
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
@@ -65,6 +70,7 @@ internal class ClientProxy : CommonProxy() {
         MinecraftForge.EVENT_BUS.register(TACZCameraRecoilHandler::class.java)
         // 第三人称玩家动画驱动（PlayerAnimator 软依赖，没装库时整个钩子是空转）
         MinecraftForge.EVENT_BUS.register(PlayerAnimatorClientHooks::class.java)
+        MinecraftForge.EVENT_BUS.register(FpvClientHandler)
     }
 
     override fun preInit(): Unit {
@@ -77,10 +83,18 @@ internal class ClientProxy : CommonProxy() {
             EntityDrone::class.java,
             IRenderFactory { manager -> RenderDrone(manager) },
         )
+        RenderingRegistry.registerEntityRenderingHandler(
+            EntityFpvDrone::class.java,
+            IRenderFactory { manager -> RenderFpvDrone(manager) },
+        )
     }
 
     override fun init(): Unit {
         super.init()
+        // 语言码走客户端字节码直连（经 SRG 映射），不按名字反射 MC 字段；common 侧反射段仅作服务端兜底
+        TACZGunPackPresentation.bindCurrentLanguageCodeResolver {
+            Minecraft.getMinecraft().gameSettings.language
+        }
         LegacyKeyBindings.registerAll()
         LegacyParticleFactoryRegistry.register()
 
@@ -95,6 +109,7 @@ internal class ClientProxy : CommonProxy() {
         LegacyItems.WORKBENCH_C.setTileEntityItemStackRenderer(TACZBlockItemRenderer)
         LegacyItems.DRONE_CIVILIAN.setTileEntityItemStackRenderer(DroneItemRenderer)
         LegacyItems.DRONE_MILITARY.setTileEntityItemStackRenderer(DroneItemRenderer)
+        LegacyItems.FPV_DRONE.setTileEntityItemStackRenderer(DroneItemRenderer)
 
         // World-space TESR for gun smith table / workbench blocks
         ClientRegistry.bindTileEntitySpecialRenderer(GunSmithTableTileEntity::class.java, GunSmithTableTileEntityRenderer())

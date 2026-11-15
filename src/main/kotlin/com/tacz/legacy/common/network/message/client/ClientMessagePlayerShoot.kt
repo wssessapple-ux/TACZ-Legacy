@@ -42,6 +42,8 @@ public class ClientMessagePlayerShoot() : IMessage, IMessageHandler<ClientMessag
     override fun onMessage(message: ClientMessagePlayerShoot, ctx: MessageContext): IMessage? {
         val player: EntityPlayerMP = ctx.serverHandler.player
         ctx.serverHandler.player.serverWorld.addScheduledTask {
+            // FPV 遥控期间锁定宿主本体，拒绝开火请求。
+            if (com.tacz.legacy.common.entity.EntityFpvDrone.isPiloting(player.uniqueID)) return@addScheduledTask
             val operator = IGunOperator.fromLivingEntity(player)
             val heldGunId = (player.heldItemMainhand.item as? IGun)?.getGunId(player.heldItemMainhand)
             val result = operator.shoot(Supplier { message.pitch }, Supplier { message.yaw }, message.timestamp)

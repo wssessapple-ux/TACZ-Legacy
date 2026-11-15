@@ -1,5 +1,6 @@
 package com.tacz.legacy.client.renderer.item
 
+import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.item.IAmmo
 import com.tacz.legacy.api.item.IAmmoBox
 import com.tacz.legacy.client.model.SlotModel
@@ -9,6 +10,7 @@ import com.tacz.legacy.client.resource.TACZClientAssetManager
 import com.tacz.legacy.client.resource.pojo.TransformScale
 import com.tacz.legacy.client.resource.pojo.display.ammo.AmmoDisplay
 import com.tacz.legacy.client.resource.pojo.display.ammo.AmmoTransform
+import com.tacz.legacy.common.config.LegacyConfigManager
 import com.tacz.legacy.common.resource.TACZGunPackPresentation
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
 import net.minecraft.client.Minecraft
@@ -32,19 +34,25 @@ import org.joml.Vector3f
 internal object TACZAmmoItemRenderer : TileEntityItemStackRenderer() {
     private val SLOT_MODEL = SlotModel()
 
+    private val EMPTY_TEX = ResourceLocation(TACZLegacy.MOD_ID, "textures/item/ammo_box_empty.png")
+    private val NORMAL_TEX = ResourceLocation(TACZLegacy.MOD_ID, "textures/item/ammo_box_normal.png")
+    private val FILLED_TEX = ResourceLocation(TACZLegacy.MOD_ID, "textures/item/ammo_box_filled.png")
+
     override fun renderByItem(stack: ItemStack) {
         renderByItem(stack, 1.0f)
     }
 
     override fun renderByItem(stack: ItemStack, partialTicks: Float) {
         val item = stack.item
-        if (item !is IAmmo && item !is IAmmoBox) return
 
-        val ammoId: ResourceLocation = when (item) {
-            is IAmmo -> item.getAmmoId(stack)
-            is IAmmoBox -> item.getAmmoId(stack)
-            else -> return
+        // 弹药箱：走内置三态 sprite，不套枪包弹药 display。
+        if (item is IAmmoBox) {
+            renderAmmoBox(stack, item)
+            return
         }
+        if (item !is IAmmo) return
+
+        val ammoId: ResourceLocation = item.getAmmoId(stack)
         val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
 
         val displayId = TACZGunPackPresentation.resolveAmmoDisplayId(snapshot, ammoId) ?: return
@@ -100,7 +108,28 @@ internal object TACZAmmoItemRenderer : TileEntityItemStackRenderer() {
     private fun renderSlotTexture(display: AmmoDisplay) {
         val slotTexLoc = display.slotTextureLocation ?: return
         val registeredSlot = TACZClientAssetManager.getTextureLocation(slotTexLoc) ?: return
-        Minecraft.getMinecraft().textureManager.bindTexture(registeredSlot)
+        renderFlatTexture(registeredSlot)
+    }
+
+    /** 弹药箱三态内置 sprite，只表存量，不标口径。 */
+    private fun renderAmmoBox(stack: ItemStack, box: IAmmoBox) {
+        renderFlatTexture(resolveAmmoBoxTexture(stack, box))
+    }
+
+    private fun resolveAmmoBoxTexture(stack: ItemStack, box: IAmmoBox): ResourceLocation {
+        // 创意 / 全类型创意：按满箱显示。
+        if (box.isCreative(stack) || box.isAllTypeCreative(stack)) return FILLED_TEX
+        val count = box.getAmmoCount(stack)
+        if (count <= 0) return EMPTY_TEX
+        val ammoId = box.getAmmoId(stack)
+        val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
+        val stackSize = snapshot.ammos[ammoId]?.stackSize?.coerceAtLeast(1) ?: 1
+        val max = (stackSize * LegacyConfigManager.server.ammoBoxStackSize).coerceAtLeast(1)
+        return if (count >= max) FILLED_TEX else NORMAL_TEX
+    }
+
+    private fun renderFlatTexture(texLoc: ResourceLocation) {
+        Minecraft.getMinecraft().textureManager.bindTexture(texLoc)
 
         GlStateManager.pushMatrix()
         GlStateManager.translate(0.5f, 1.5f, 0.5f)

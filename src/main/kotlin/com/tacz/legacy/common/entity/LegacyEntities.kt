@@ -71,10 +71,18 @@ internal object LegacyEntities {
         .tracker(64, 1, true)
         .build()
 
+    internal val FPV_DRONE: EntityEntry = EntityEntryBuilder.create<EntityFpvDrone>()
+        .entity(EntityFpvDrone::class.java)
+        .id(ResourceLocation(TACZLegacy.MOD_ID, "fpv_drone"), 3)
+        .name("fpv_drone")
+        .tracker(64, 1, true)
+        .build()
+
     internal fun registerAll(registry: IForgeRegistry<EntityEntry>): Unit {
         registry.register(BULLET)
         registry.register(TARGET_MINECART)
         registry.register(DRONE)
+        registry.register(FPV_DRONE)
     }
 }
 

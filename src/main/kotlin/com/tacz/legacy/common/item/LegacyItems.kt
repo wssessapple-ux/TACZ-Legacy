@@ -12,6 +12,9 @@ import com.tacz.legacy.api.item.gun.GunItemManager
 import com.tacz.legacy.common.block.LegacyBlocks
 import com.tacz.legacy.common.block.entity.GunSmithTableTileEntity
 import com.tacz.legacy.common.config.LegacyConfigManager
+import com.tacz.legacy.common.entity.EntityFpvDrone
+import com.tacz.legacy.common.network.TACZNetworkHandler
+import com.tacz.legacy.common.network.message.event.ServerMessageFpvControlState
 import com.tacz.legacy.common.resource.BoltType
 import com.tacz.legacy.common.resource.GunDataAccessor
 import com.tacz.legacy.common.resource.TACZGunPackPresentation
@@ -24,6 +27,7 @@ import net.minecraft.client.util.ITooltipFlag
 import net.minecraft.creativetab.CreativeTabs
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
+import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.item.Item
 import net.minecraft.item.ItemBlock
 import net.minecraft.item.ItemStack
@@ -39,6 +43,7 @@ import net.minecraft.util.text.TextComponentTranslation
 import net.minecraft.util.text.TextFormatting
 import net.minecraftforge.items.CapabilityItemHandler
 import net.minecraftforge.items.IItemHandler
+import net.minecraftforge.items.IItemHandlerModifiable
 import net.minecraftforge.fml.relauncher.Side
 import net.minecraftforge.fml.relauncher.SideOnly
 import net.minecraftforge.registries.IForgeRegistry
@@ -52,6 +57,7 @@ internal object LegacyItems {
     internal val TARGET_MINECART: LegacySimpleItem = LegacySimpleItem(maxStackSize = 1).named("target_minecart", LegacyCreativeTabs.OTHER)
     internal val DRONE_CIVILIAN: DroneItem = DroneItem(isMilitary = false).named("drone_civilian", LegacyCreativeTabs.OTHER)
     internal val DRONE_MILITARY: DroneItem = DroneItem(isMilitary = true).named("drone_military", LegacyCreativeTabs.OTHER)
+    internal val FPV_DRONE: FpvDroneItem = FpvDroneItem().named("fpv_drone", LegacyCreativeTabs.OTHER)
 
     internal val GUN_SMITH_TABLE: LegacyBlockItem = createBlockItem(LegacyBlocks.GUN_SMITH_TABLE)
     internal val WORKBENCH_A: LegacyBlockItem = createBlockItem(LegacyBlocks.WORKBENCH_A)
@@ -69,6 +75,7 @@ internal object LegacyItems {
         TARGET_MINECART,
         DRONE_CIVILIAN,
         DRONE_MILITARY,
+        FPV_DRONE,
         GUN_SMITH_TABLE,
         WORKBENCH_A,
         WORKBENCH_B,
@@ -531,10 +538,23 @@ internal class ModernKineticGunItem : Item(), IGun {
     }
 
     override fun hasInventoryAmmo(shooter: EntityLivingBase, stack: ItemStack, needCheckAmmo: Boolean): Boolean {
-        if (!useInventoryAmmo(stack)) return false
         if (!needCheckAmmo) return true
         if (useDummyAmmo(stack)) return getDummyAmmoAmount(stack) > 0
-        // 通过 IItemHandler capability 搜索背包弹药（与上游 TACZ 逻辑一致）
+
+        // 玩家优先遍历原生背包槽位，找不到再回退 IItemHandler capability（与上游 TACZ 一致）
+        if (shooter is EntityPlayer) {
+            val inventory = shooter.inventory
+            for (slot in 0 until inventory.sizeInventory) {
+                val checkStack = inventory.getStackInSlot(slot)
+                if (checkStack.isEmpty) continue
+                val ammo = checkStack.item as? IAmmo
+                if (ammo != null && ammo.isAmmoOfGun(stack, checkStack)) return true
+                val box = checkStack.item as? IAmmoBox
+                if (box != null && box.isAmmoBoxOfGun(stack, checkStack)) return true
+            }
+            return false
+        }
+
         val handler = shooter.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null)
         if (handler != null) {
             for (i in 0 until handler.slots) {
@@ -567,13 +587,18 @@ internal class ModernKineticGunItem : Item(), IGun {
             }
             val box = checkStack.item as? IAmmoBox
             if (box != null && box.isAmmoBoxOfGun(gunItem, checkStack)) {
+                // 直接改动 handler 返回栈违反 IItemHandler 契约：需要可写回的处理者，否则不得报告消耗成功
+                val modifiable = handler as? IItemHandlerModifiable ?: continue
                 val boxCount = box.getAmmoCount(checkStack)
                 val extract = minOf(boxCount, remaining)
+                if (extract <= 0) continue
+                val boxCopy = checkStack.copy()
                 val leftover = boxCount - extract
-                box.setAmmoCount(checkStack, leftover)
+                box.setAmmoCount(boxCopy, leftover)
                 if (leftover <= 0) {
-                    box.setAmmoId(checkStack, DefaultAssets.EMPTY_AMMO_ID)
+                    box.setAmmoId(boxCopy, DefaultAssets.EMPTY_AMMO_ID)
                 }
+                modifiable.setStackInSlot(i, boxCopy)
                 remaining -= extract
             }
         }
@@ -837,14 +862,17 @@ internal open class LegacyBlockItem(block: net.minecraft.block.Block) : ItemBloc
 }
 
 /**
- * 区块加载器物品：提示栏走本地化语言键，按客户端游戏语言显示。
+ * 区块加载器物品：独立原创方块，不在枪包数据里，名字直接读本地化键，
+ * 不走 [LegacyBlockItem] 的枪包运行时取名回退链路。
  */
 internal class ChunkLoaderBlockItem(block: net.minecraft.block.Block) : LegacyBlockItem(block) {
     init {
         registryName = requireNotNull(block.registryName)
-        setTranslationKey("${TACZLegacy.MOD_ID}.${requireNotNull(block.registryName).path}")
         setCreativeTab(LegacyCreativeTabs.DECORATION)
     }
+
+    override fun getItemStackDisplayName(stack: ItemStack): String =
+        I18n.format("block.tacz.chunk_loader")
 
     @SideOnly(Side.CLIENT)
     override fun addInformation(stack: ItemStack, worldIn: World?, tooltip: MutableList<String>, flagIn: ITooltipFlag) {
@@ -1003,5 +1031,96 @@ internal open class DroneItem(private val isMilitary: Boolean) : Item() {
         }
 
         return closest
+    }
+}
+
+/**
+ * FPV 第一人称侦察无人机物品。纯侦察、不带武器，可遥控、悬停、回收复用。
+ *
+ * 交互（服务端权威）：
+ * - 普通右键（无实体记录）：在玩家头顶部署一架 FPV 无人机，记录实体 ID 到物品 NBT。
+ * - 普通右键（已有空闲实体）：进入该无人机第一人称视角。
+ * - 地面潜行 + 右键空闲机：召回回收，实体销毁，物品留在背包（可重复使用）。
+ * - 视角内退出/召回不走原版物品右键：走 C2S `ClientMessageFpvExit`（守卫已 piloting 期间拦截右键）。
+ *
+ * 物品不消耗；每玩家限一架（NBT 记录唯一实体 ID）。
+ */
+internal class FpvDroneItem : Item() {
+    init {
+        maxStackSize = 1
+    }
+
+    @SideOnly(Side.CLIENT)
+    override fun addInformation(stack: ItemStack, worldIn: World?, tooltip: MutableList<String>, flagIn: ITooltipFlag) {
+        tooltip += "${TextFormatting.GRAY}${I18n.format("tooltip.tacz.fpv_drone.desc")}"
+        tooltip += "${TextFormatting.GRAY}${TextFormatting.ITALIC}${I18n.format("tooltip.tacz.fpv_drone.usage")}"
+        tooltip += "${TextFormatting.DARK_AQUA}${I18n.format("tooltip.tacz.fpv_drone.trait")}"
+    }
+
+    override fun onItemRightClick(worldIn: World, playerIn: EntityPlayer, handIn: EnumHand): ActionResult<ItemStack> {
+        val stack = playerIn.getHeldItem(handIn)
+        if (worldIn.isRemote) {
+            return ActionResult.newResult(EnumActionResult.PASS, stack)
+        }
+        val mp = playerIn as? EntityPlayerMP ?: return ActionResult.newResult(EnumActionResult.PASS, stack)
+
+        val tag = stack.tagCompound
+        val droneId = if (tag != null && tag.hasKey("DroneId")) tag.getInteger("DroneId") else -1
+        var drone = if (droneId != -1) worldIn.getEntityByID(droneId) as? EntityFpvDrone else null
+        // 实体 ID 在世界重载后会重新分配；ID 失效时按主人 UUID 兜底找回仍存活的那架。
+        if (drone == null || !drone.isEntityAlive || !drone.isOwner(playerIn)) {
+            drone = worldIn.loadedEntityList.firstOrNull {
+                it is EntityFpvDrone && it.isEntityAlive && it.isOwner(playerIn)
+            } as? EntityFpvDrone
+        }
+
+        if (drone != null && drone.isEntityAlive && drone.isOwner(playerIn)) {
+            // 受控期间原版右键被守卫拦截，到不了这里；退出/召回只走 C2S 报文。
+            if (drone.isControlled()) {
+                return ActionResult.newResult(EnumActionResult.PASS, stack)
+            }
+            when {
+                playerIn.isSneaking -> {
+                    // 地面空闲机潜行右键：召回回收（视角内召回走 C2S，不走这里）。
+                    drone.stopControl(recall = true)
+                    stack.tagCompound?.removeTag("DroneId")
+                    TACZNetworkHandler.sendToPlayer(ServerMessageFpvControlState(drone.entityId, controlled = false), mp)
+                    playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.recalled"))
+                }
+                else -> {
+                    if (drone.startControl(playerIn)) {
+                        TACZNetworkHandler.sendToPlayer(ServerMessageFpvControlState(drone.entityId, controlled = true), mp)
+                        playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.entered"))
+                    } else {
+                        playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.unavailable"))
+                    }
+                }
+            }
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        // 记录的实体已失效：最后再扫一遍已加载实体，确认没有主人的其他存活机；
+        // 有就复用并直接进入视角，避免重复部署出一架孤儿实体。
+        val existing = worldIn.loadedEntityList.firstOrNull {
+            it is EntityFpvDrone && it.isEntityAlive && it.isOwner(playerIn)
+        } as? EntityFpvDrone
+        if (existing != null) {
+            ensureTag(stack).setInteger("DroneId", existing.entityId)
+            if (existing.startControl(playerIn)) {
+                TACZNetworkHandler.sendToPlayer(ServerMessageFpvControlState(existing.entityId, controlled = true), mp)
+                playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.entered"))
+            } else {
+                playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.unavailable"))
+            }
+            return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
+        }
+
+        // 已加载范围内确实没有存活机，才新建一架。
+        stack.tagCompound?.removeTag("DroneId")
+        val newDrone = EntityFpvDrone(worldIn, playerIn)
+        worldIn.spawnEntity(newDrone)
+        ensureTag(stack).setInteger("DroneId", newDrone.entityId)
+        playerIn.sendMessage(TextComponentTranslation("message.tacz.fpv.deployed"))
+        return ActionResult.newResult(EnumActionResult.SUCCESS, stack)
     }
 }

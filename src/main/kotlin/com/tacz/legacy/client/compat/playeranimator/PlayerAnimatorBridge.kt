@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.tacz.legacy.TACZLegacy
 import com.tacz.legacy.api.entity.IGunOperator
+import com.tacz.legacy.api.event.GunShootEvent
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.client.compat.playeranimator.animation.RotationAdjustmentModifier
 import com.tacz.legacy.client.resource.TACZClientAssetManager
@@ -25,6 +26,7 @@ import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.item.ItemStack
 import net.minecraft.util.ResourceLocation
 import net.minecraft.world.World
+import net.minecraftforge.fml.relauncher.Side
 import org.apache.logging.log4j.MarkerManager
 import java.nio.charset.StandardCharsets
 import java.util.LinkedHashMap
@@ -322,6 +324,44 @@ internal class PlayerAnimatorBridge {
         triggerOnce(layer, clips, clipName)
     }
 
+    /**
+     * 事件驱动开火入口：只服务**远程玩家**。本地开火仍由输入流程直调 [onShoot]，
+     * 时机和已验证手感不动；远程玩家的开火由 S2C 报文广播上来的 [GunShootEvent] 触发。
+     */
+    fun onGunShoot(event: GunShootEvent) {
+        if (event.logicalSide != Side.CLIENT) return
+        val player = event.shooter as? AbstractClientPlayer ?: return
+        if (isLocalPlayer(player)) return
+
+        val clips = resolveClips(player.heldItemMainhand) ?: resolveClipsByGunId(event.gunId) ?: return
+        val operator = player as? IGunOperator
+        val aiming = isAiming(operator)
+        val lie = operator?.getDataHolder()?.isCrawling == true
+
+        val preferred = when {
+            aiming && lie -> CLIP_LIE_AIM_FIRE
+            aiming -> CLIP_AIM_FIRE_UPPER
+            lie -> CLIP_LIE_NORMAL_FIRE
+            else -> CLIP_NORMAL_FIRE_UPPER
+        }
+        // 趴卧 clip 缺失时回退到对应站姿 clip
+        val clipName = if (clips.containsKey(preferred)) {
+            preferred
+        } else if (aiming) {
+            CLIP_AIM_FIRE_UPPER
+        } else {
+            CLIP_NORMAL_FIRE_UPPER
+        }
+
+        val layer = layerFor(player) ?: return
+        triggerOnce(layer, clips, clipName)
+    }
+
+    private fun isLocalPlayer(player: AbstractClientPlayer): Boolean {
+        val mc = Minecraft.getMinecraft()
+        return mc.player != null && mc.player === player
+    }
+
     /** 近战：上游是随机取三段之一，这里照抄。 */
     fun onMelee(player: EntityPlayer?) {
         val clientPlayer = player as? AbstractClientPlayer ?: return
@@ -406,8 +446,14 @@ internal class PlayerAnimatorBridge {
      */
     private fun resolveClips(stack: ItemStack): Map<String, KeyframeAnimation>? {
         val gun = stack.item as? IGun ?: return null
+        return resolveClipsByGunId(gun.getGunId(stack))
+    }
+
+    /** 远程事件只带 gunId，手持物未同步时按 gunId 反查 display 解析动画。 */
+    private fun resolveClipsByGunId(gunId: ResourceLocation?): Map<String, KeyframeAnimation>? {
+        gunId ?: return null
         val snapshot = TACZGunPackRuntimeRegistry.getSnapshot()
-        val displayId = TACZGunPackPresentation.resolveGunDisplayId(snapshot, gun.getGunId(stack)) ?: return null
+        val displayId = TACZGunPackPresentation.resolveGunDisplayId(snapshot, gunId) ?: return null
 
         val declaredId = animationByDisplay[displayId]
         if (declaredId != null) {
@@ -578,6 +624,8 @@ internal class PlayerAnimatorBridge {
         private const val CLIP_RELOAD_UPPER = "reload_upper"
         private const val CLIP_NORMAL_FIRE_UPPER = "normal_fire_upper"
         private const val CLIP_AIM_FIRE_UPPER = "aim_fire_upper"
+        private const val CLIP_LIE_NORMAL_FIRE = "lie_normal_fire"
+        private const val CLIP_LIE_AIM_FIRE = "lie_aim_fire"
 
         private const val CLIP_HOLD_LOWER = "hold_lower"
         private const val CLIP_WALK_LOWER = "walk_lower"

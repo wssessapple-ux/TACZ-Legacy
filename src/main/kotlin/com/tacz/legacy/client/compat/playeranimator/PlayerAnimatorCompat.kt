@@ -1,6 +1,7 @@
 package com.tacz.legacy.client.compat.playeranimator
 
 import com.tacz.legacy.common.resource.TACZRuntimeSnapshot
+import com.tacz.legacy.api.event.GunShootEvent
 import net.minecraft.client.entity.AbstractClientPlayer
 import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
@@ -87,6 +88,12 @@ internal object PlayerAnimatorCompat {
     /** 成功打出一发子弹时调用（不是每 tick 调，只在真开火时调）。 */
     fun onShoot(player: EntityPlayer?) {
         bridge()?.onShoot(player)
+    }
+
+    /** 开火事件入口（本地 + 远程玩家统一走事件总线）。 */
+    @JvmStatic
+    fun onGunShoot(event: GunShootEvent) {
+        bridge()?.onGunShoot(event)
     }
 
     /** 近战挥砍时调用。 */

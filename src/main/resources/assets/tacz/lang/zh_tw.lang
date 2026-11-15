@@ -147,6 +147,7 @@ gui.tacz.gun_smith_table.ingredient=配方：
 gui.tacz.gun_smith_table.license=§授權§r: 
 gui.tacz.gun_smith_table.preview=預覽
 gui.tacz.interact_key.text.desc=按 [%s] 互動
+item.tacz.ammo_box.name=彈藥箱
 item.tacz.ammo_box.all_type_creative=創造模式通用彈藥箱
 item.tacz.ammo_box.creative=創造模式彈藥箱
 item.tacz.ammo_box.diamond=鑽石彈藥箱

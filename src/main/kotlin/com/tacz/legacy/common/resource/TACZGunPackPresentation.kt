@@ -19,6 +19,19 @@ internal object TACZGunPackPresentation {
     @Volatile
     private var currentLanguageCodeResolverOverride: (() -> String?)? = null
 
+    /**
+     * 客户端门面注册当前语言码回调。client 侧用字节码直连 `Minecraft.gameSettings.language`（经 SRG 映射），
+     * 避免在 1.12.2 生产环境按名字反射 MC 方法/字段——反射字符串不经过 SRG 重映射，按原名取不到。
+     * 服务端不注册，回调保持 null，回退到 [Locale.getDefault]。
+     */
+    fun bindCurrentLanguageCodeResolver(resolver: (() -> String?)?) {
+        currentLanguageCodeResolverOverride = resolver
+    }
+
+    internal fun setCurrentLanguageCodeResolverForTests(resolver: (() -> String?)?) {
+        currentLanguageCodeResolverOverride = resolver
+    }
+
     fun localeCandidates(): List<String> = localeCandidates(resolveCurrentClientLanguageCode(), Locale.getDefault())
 
     internal fun localeCandidates(currentLanguageCode: String?, fallbackLocale: Locale): List<String> {
@@ -31,10 +44,6 @@ internal object TACZGunPackPresentation {
         }
         candidates += DEFAULT_LOCALE
         return candidates.filter(String::isNotBlank).toList()
-    }
-
-    internal fun setCurrentLanguageCodeResolverForTests(resolver: (() -> String?)?) {
-        currentLanguageCodeResolverOverride = resolver
     }
 
     fun localizedText(

@@ -8,6 +8,7 @@ import com.tacz.legacy.common.item.LegacyItems
 import com.tacz.legacy.common.resource.TACZGunPackRuntimeRegistry
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.entity.player.InventoryPlayer
+import net.minecraft.inventory.ClickType
 import net.minecraft.inventory.Container
 import net.minecraft.inventory.IInventory
 import net.minecraft.inventory.Slot
@@ -15,6 +16,7 @@ import net.minecraft.item.ItemStack
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.text.ITextComponent
 import net.minecraft.util.text.TextComponentString
+import kotlin.math.ceil
 
 /**
  * 弹药箱的内部虚拟库存：单个槽位映射到弹药箱 ItemStack 的 NBT（AmmoId + AmmoCount）。
@@ -143,7 +145,9 @@ internal class AmmoBoxSlot(inv: AmmoBoxInventory, x: Int, y: Int) : Slot(inv, 0,
         return boxId == DefaultAssets.EMPTY_AMMO_ID || boxId == id
     }
 
-    override fun getSlotStackLimit(): Int = 64
+    override fun getSlotStackLimit(): Int = (inventory as AmmoBoxInventory).maxStackLimit
+
+    override fun getItemStackLimit(stack: ItemStack): Int = (inventory as AmmoBoxInventory).maxStackLimit
 }
 
 internal class AmmoBoxContainer(
@@ -173,42 +177,134 @@ internal class AmmoBoxContainer(
     override fun canInteractWith(playerIn: EntityPlayer): Boolean =
         playerIn == player && !playerIn.heldItemMainhand.isEmpty && playerIn.heldItemMainhand.item === ammoBox.item
 
+    /**
+     * 弹药槽是映射 NBT 的虚拟库存：原版 slotClick 的同口径合并分支会直接对槽位返回的
+     * 临时副本做 grow/shrink 而不落盘，导致光标与箱子计数脱节（刷/丢子弹）。这里把弹药槽
+     * 的 PICKUP / THROW 摘出来走"读副本 → 口径/容量校验 → 显式 putStack/decrStackSize 提交"，
+     * 背包槽仍交回原版流程。SWAP（数字键换栏）禁止进弹药槽，避免绕过口径校验。
+     */
+    override fun slotClick(slotId: Int, dragType: Int, clickType: ClickType, player: EntityPlayer): ItemStack {
+        if (slotId == 0) {
+            when (clickType) {
+                ClickType.PICKUP -> return clickAmmoSlotPickup(player, dragType)
+                ClickType.THROW -> return clickAmmoSlotThrow(player, dragType)
+                ClickType.SWAP -> return ItemStack.EMPTY
+                else -> {}
+            }
+        }
+        return super.slotClick(slotId, dragType, clickType, player)
+    }
+
+    /** PICKUP：光标空→从箱取（左键全取/右键取半）；光标有弹→校验口径后放入或合并。 */
+    private fun clickAmmoSlotPickup(player: EntityPlayer, dragType: Int): ItemStack {
+        val boxSlot = inventorySlots[0]
+        val cursor = player.inventory.itemStack
+        val boxStack = boxSlot.getStack()
+
+        // 光标为空：从箱子取出
+        if (cursor.isEmpty) {
+            if (boxStack.isEmpty) return ItemStack.EMPTY
+            val takeCount = if (dragType == 0) boxStack.count else ceil(boxStack.count / 2.0).toInt()
+            val taken = boxSlot.decrStackSize(takeCount)
+            if (taken.isEmpty) return ItemStack.EMPTY
+            player.inventory.itemStack = taken
+            boxSlot.onTake(player, taken)
+            return taken
+        }
+
+        // 光标有物：弹药槽只收弹药
+        val cursorAmmo = cursor.item as? IAmmo ?: return ItemStack.EMPTY
+        val cursorId = cursorAmmo.getAmmoId(cursor)
+        if (cursorId == DefaultAssets.EMPTY_AMMO_ID) return ItemStack.EMPTY
+        val boxId = ammoInventory.ammoId
+        if (boxId != DefaultAssets.EMPTY_AMMO_ID && boxId != cursorId) return ItemStack.EMPTY
+
+        val boxLimit = ammoInventory.maxStackLimit
+        val putOne = dragType == 1
+
+        if (boxStack.isEmpty) {
+            val putCount = minOf(cursor.count, boxLimit).let { if (putOne) 1 else it }
+            if (putCount <= 0) return ItemStack.EMPTY
+            val put = cursor.copy()
+            put.count = putCount
+            boxSlot.putStack(put)
+            cursor.shrink(putCount)
+            if (cursor.isEmpty) player.inventory.itemStack = ItemStack.EMPTY
+        } else {
+            val room = boxLimit - boxStack.count
+            if (room <= 0) return ItemStack.EMPTY
+            val putCount = minOf(cursor.count, room).let { if (putOne) 1 else it }
+            if (putCount <= 0) return ItemStack.EMPTY
+            val merged = boxStack.copy()
+            merged.count = boxStack.count + putCount
+            boxSlot.putStack(merged)
+            cursor.shrink(putCount)
+            if (cursor.isEmpty) player.inventory.itemStack = ItemStack.EMPTY
+        }
+        boxSlot.onSlotChanged()
+        return ItemStack.EMPTY
+    }
+
+    /** THROW（Q 键丢出）：从箱子按实际取出量写回 NBT，再丢到世界。 */
+    private fun clickAmmoSlotThrow(player: EntityPlayer, dragType: Int): ItemStack {
+        val boxSlot = inventorySlots[0]
+        val boxStack = boxSlot.getStack()
+        if (boxStack.isEmpty || !boxSlot.canTakeStack(player)) return ItemStack.EMPTY
+        val amount = if (dragType == 0) 1 else boxStack.count
+        val taken = boxSlot.decrStackSize(amount)
+        if (taken.isEmpty) return ItemStack.EMPTY
+        player.dropItem(taken, true)
+        return ItemStack.EMPTY
+    }
+
     override fun transferStackInSlot(playerIn: EntityPlayer, index: Int): ItemStack {
         val slot = inventorySlots.getOrNull(index) ?: return ItemStack.EMPTY
         val stack = slot.getStack()
         if (stack.isEmpty) return ItemStack.EMPTY
 
         if (index == 0) {
-            // 弹箱 -> 背包：尽量转移
+            // 弹箱 -> 背包：先合并同类，再放空槽，最后按实际移动量写回 NBT。
             val toMove = stack.copy()
             var remaining = toMove.count
+
             for (i in 1 until inventorySlots.size) {
                 if (remaining <= 0) break
                 val target = inventorySlots[i]
                 val existing = target.getStack()
-                if (existing.isEmpty) {
-                    val putCount = minOf(remaining, target.getSlotStackLimit())
-                    val put = toMove.copy()
-                    put.count = putCount
-                    target.putStack(put)
-                    remaining -= putCount
-                } else if (existing.isItemEqual(toMove) && ItemStack.areItemStackTagsEqual(existing, toMove)) {
+                if (!existing.isEmpty && existing.isItemEqual(toMove) && ItemStack.areItemStackTagsEqual(existing, toMove)) {
                     val room = target.getSlotStackLimit() - existing.count
                     if (room > 0) {
-                        val putCount = minOf(remaining, room)
-                        existing.count += putCount
+                        val n = minOf(remaining, room)
+                        existing.count += n
                         target.onSlotChanged()
-                        remaining -= putCount
+                        remaining -= n
                     }
                 }
             }
+            for (i in 1 until inventorySlots.size) {
+                if (remaining <= 0) break
+                val target = inventorySlots[i]
+                if (target.getStack().isEmpty) {
+                    val n = minOf(remaining, target.getSlotStackLimit())
+                    val put = toMove.copy()
+                    put.count = n
+                    target.putStack(put)
+                    remaining -= n
+                }
+            }
+
             val moved = toMove.count - remaining
-            val newCount = stack.count - moved
-            ammoInventory.setInventorySlotContents(0, if (newCount <= 0) ItemStack.EMPTY else stack.copy().apply { count = newCount })
-            return stack
+            if (moved > 0) {
+                val newCount = stack.count - moved
+                ammoInventory.setInventorySlotContents(
+                    0,
+                    if (newCount <= 0) ItemStack.EMPTY else stack.copy().apply { count = newCount },
+                )
+            }
+            return ItemStack.EMPTY
         }
 
-        // 背包 -> 弹箱：非空箱强校验口径；空箱允许装入任意口径（放入时设定口径）
+        // 背包 -> 弹箱：非空箱强校验口径；空箱允许装入任意口径（放入时设定口径）。
         val iAmmo = stack.item as? IAmmo ?: return ItemStack.EMPTY
         val putId = iAmmo.getAmmoId(stack)
         if (putId == DefaultAssets.EMPTY_AMMO_ID) return ItemStack.EMPTY
@@ -216,22 +312,31 @@ internal class AmmoBoxContainer(
         if (boxId != DefaultAssets.EMPTY_AMMO_ID && boxId != putId) return ItemStack.EMPTY
         val boxSlot = inventorySlots[0]
         if (!boxSlot.isItemValid(stack)) return ItemStack.EMPTY
+
         val boxLimit = ammoInventory.maxStackLimit
         val existing = boxSlot.getStack()
-        if (existing.isEmpty) {
-            val putCount = minOf(stack.count, boxLimit)
-            val put = stack.copy()
-            put.count = putCount
-            boxSlot.putStack(put)
-            stack.count -= putCount
+        val putCount = if (existing.isEmpty) {
+            minOf(stack.count, boxLimit)
         } else {
             val room = boxLimit - existing.count
             if (room <= 0) return ItemStack.EMPTY
-            val putCount = minOf(stack.count, room)
-            boxSlot.putStack(existing.copy().apply { count = existing.count + putCount })
-            stack.count -= putCount
+            minOf(stack.count, room)
         }
-        slot.onSlotChanged()
+        if (putCount <= 0) return ItemStack.EMPTY
+
+        if (existing.isEmpty) {
+            val put = stack.copy()
+            put.count = putCount
+            boxSlot.putStack(put)
+        } else {
+            boxSlot.putStack(existing.copy().apply { count = existing.count + putCount })
+        }
+        stack.count -= putCount
+        if (stack.count <= 0) {
+            slot.putStack(ItemStack.EMPTY)
+        } else {
+            slot.onSlotChanged()
+        }
         return stack
     }
 

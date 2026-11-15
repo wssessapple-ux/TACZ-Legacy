@@ -3,6 +3,7 @@ package com.tacz.legacy.mixin.minecraft.client;
 import com.tacz.legacy.api.client.other.KeepingItemRenderer;
 import com.tacz.legacy.api.item.IGun;
 import com.tacz.legacy.client.event.FirstPersonFovHooks;
+import com.tacz.legacy.client.fpv.FpvController;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.renderer.EntityRenderer;
@@ -12,6 +13,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -39,6 +41,15 @@ public abstract class EntityRendererMixin {
     private void tacz$skipGunItemHandBobbing(EntityRenderer instance, float partialTicks) {
         if (!tacz$shouldSkipHandBobbing()) {
             applyBobbing(partialTicks);
+        }
+    }
+
+    @Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)
+    private void tacz$hideFpvHeldItem(float partialTicks, int pass, CallbackInfo ci) {
+        // FPV 镜头挂在无人机上：原版手部渲染只判第一人称、不看视角实体是谁，
+        // 宿主手里的枪/物品第一人称模型会外露穿帮。FPV 期间整只手与手持物都不渲染。
+        if (FpvController.isFpvActive()) {
+            ci.cancel();
         }
     }
 

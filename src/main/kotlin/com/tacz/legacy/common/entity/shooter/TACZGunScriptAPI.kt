@@ -2,8 +2,6 @@ package com.tacz.legacy.common.entity.shooter
 
 import com.tacz.legacy.api.DefaultAssets
 import com.tacz.legacy.api.event.GunFireEvent
-import com.tacz.legacy.api.item.IAmmo
-import com.tacz.legacy.api.item.IAmmoBox
 import com.tacz.legacy.api.item.IGun
 import com.tacz.legacy.api.item.attachment.AttachmentType
 import com.tacz.legacy.api.item.gun.FireMode
@@ -248,27 +246,7 @@ internal class TACZGunScriptAPI {
         if (!isReloadingNeedConsumeAmmo()) return true
         val gun = iGun ?: return false
         if (gun.useDummyAmmo(itemStack)) return gun.getDummyAmmoAmount(itemStack) > 0
-        return if (gun.useInventoryAmmo(itemStack)) {
-            gun.hasInventoryAmmo(shooter, itemStack, true)
-        } else {
-            // magazine 逐发装填（如霰弹枪）：脚本从背包扣弹壳，必须搜背包
-            inventoryHasAmmoForGun()
-        }
-    }
-
-    private fun inventoryHasAmmoForGun(): Boolean {
-        // 客户端预测：装填推进由服务端主导，客户端默认有弹
-        if (shooter.world.isRemote) return true
-        val handler = shooter.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null) ?: return false
-        for (i in 0 until handler.slots) {
-            val s = handler.getStackInSlot(i)
-            if (s.isEmpty) continue
-            val ia = s.item as? IAmmo
-            if (ia != null && ia.isAmmoOfGun(itemStack, s)) return true
-            val ib = s.item as? IAmmoBox
-            if (ib != null && ib.isAmmoBoxOfGun(itemStack, s)) return true
-        }
-        return false
+        return gun.hasInventoryAmmo(shooter, itemStack, true)
     }
 
     fun putAmmoInMagazine(amount: Int): Int {
