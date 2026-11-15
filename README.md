@@ -452,3 +452,5 @@ jar 内打包（shade）了以下公开开源依赖，用于脚本执行与数�
 - **[zsjs110110-cpu (真·转瞬即逝)](https://github.com/zsjs110110-cpu)**：
   - **核心贡献**：独立完成了 PlayerAnimator 1.12.2 的反向移植（MIT 协议），为 TACZ-Legacy 提供了极其关键的底层第三人称骨骼动画支持。
   - 基于其开源成果，本模组成功实现了换弹、开枪、走路等真实的第三人称持枪动作。
+  - **[aefawgawga] (https://github.com/aefawgawga)**: 多次反馈第三人称问题,为 TACZ-Legacy 第三人称动画打下基础.
+
