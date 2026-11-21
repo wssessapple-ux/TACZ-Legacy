@@ -265,6 +265,7 @@
 
 - Bug 反馈请使用仓库的 Issue 模板提交，请尽可能附上游戏日志、版本信息、复现步骤。
 - 安装、配置、使用类求助请到 **Discussions** 讨论区。
+- 行为准则相关的举报或私密联系，可发邮件至 <taczlegacy@163.com>，详见 [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)。
 - 上游原始代码产生的缺陷请不要向 KasumiNova 的上游仓库提交反馈。
 - 本仓库为 KasumiNova/TACZ-Legacy 上游源码的编译分发仓库。
 - 上游项目许可证：GPL-3.0，本分发项目同样以 GPL-3.0 开源。

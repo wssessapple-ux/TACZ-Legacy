@@ -46,7 +46,10 @@
 
 ## 举报方式
 
-如果遇到或目睹了不可接受的行为，请通过**私密渠道**联系维护者 **wssessapple-ux**（GitHub 私信：<https://github.com/wssessapple-ux>）。
+如果遇到或目睹了不可接受的行为，请通过**私密渠道**联系维护者 **wssessapple-ux**，任选以下一种方式：
+
+- GitHub 私信：<https://github.com/wssessapple-ux>
+- 项目专用邮箱：<taczlegacy@163.com>
 
 - 举报会被**保密处理**，不会公开举报者身份，也不会向被举报者泄露举报来源。
 - 请尽量附上相关链接、截图、时间和经过描述，便于核实。
@@ -81,4 +84,5 @@
 ## 联系与补充
 
 - 维护者：wssessapple-ux
+- 项目专用邮箱：<taczlegacy@163.com>
 - 一般安装、配置、玩法问题请走 Discussions；Bug 反馈走 Issue，具体指引见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
