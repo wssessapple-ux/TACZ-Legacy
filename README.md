@@ -3,7 +3,7 @@
 > ⚠️【非官方移植构建版】本项目为社区非官方移植，与原作者及官方 TaCZ 项目无关。
 
 
-> 📢 **【正式授权声明】**：**本项目已获得原作者 **Hikari_Nova** 的官方认可与接手授权（详见 [授权存档](./AUTHORIZATION.md)）。原作者由于精力受限，已明确表示不再活跃于 1.12.2 领域，后续的 1.12.2 移植版将由 **wssessapple-ux** 接手进行持续的 Bug 修复与功能补全。**
+> 📢 **【正式授权声明】**：**本项目已获得原作者 **Hikari_Nova** 的官方认可与接手授权（详见 [授权存档](./docs/AUTHORIZATION.md)）。原作者由于精力受限，已明确表示不再活跃于 1.12.2 领域，后续的 1.12.2 移植版将由 **wssessapple-ux** 接手进行持续的 Bug 修复与功能补全。**
 
 
 📢 如果这个项目帮到了你，请点右上角 ⭐ Star 支持一下！你的每一次 Star 都是让更多玩家看到 1.12.2 唯一 TaCZ 的机会！
@@ -369,7 +369,7 @@ gradlew.bat build
 
 ## 文档导航
 
-- 项目总览：`PROJECT_OVERVIEW.md`
+- 项目总览：`docs/PROJECT_OVERVIEW.md`
 - 迁移蓝图：`docs/MIGRATION_PLAN.md`
 - 架构与渲染蓝图：`docs/ARCHITECTURE_BOUNDARY_AND_RENDER_PIPELINE.md`
 - Copilot 协作指引：`.github/copilot-instructions.md`
@@ -411,7 +411,7 @@ gradlew.bat build
 
 ### 3. 第三方组件
 - 第三人称动画底层：zsjs110110-cpu 移植的 PlayerAnimator 1.12.2（MIT，上游 KosmX），
-  本仓库仅编译期引用、未内嵌其类文件，版权与声明归原作者所有。
+  本仓库仅编译期引用、产物 jar 不内嵌其类文件；编译期 jar 与 MIT 许可文本见 `libs/`，版权与声明归原作者所有。
 - 其余打包（shaded）依赖（joml、luaj-jse、commons-math3 等）各按其原始开源协议。
 
 ### 4. 枪包资源
