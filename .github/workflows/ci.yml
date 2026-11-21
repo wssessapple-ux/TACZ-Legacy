@@ -7,6 +7,10 @@
 # 编译期依赖：
 #   libs/playeranimator-1.12.2-1.0.2-rc1.jar 随仓库提供（compileOnly 编译期 API，不进产物 jar），
 #   许可见 libs/LICENSE-PLAYERANIMATOR.md。
+#
+# JDK 说明：
+#   Gradle 8.1.1 守护进程必须跑在 JDK 17 上——它不支持 JDK 21 启动（报 class file major version 65）。
+#   模组源码编译用的 JDK 8 是独立 toolchain，由 foojay 解析器自动下载 provision，与 Gradle 运行 JDK 无关。
 
 name: CI
 
@@ -24,11 +28,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21（运行 Gradle）
+      - name: Set up JDK 17（运行 Gradle）
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
 
       # gradle.properties 里写的是本机 Windows JDK 绝对路径，CI 上不存在；
       # 这里把 wrapper 分发包地址换成官方源，并在下面命令行覆盖 java.home。
