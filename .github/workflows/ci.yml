@@ -34,13 +34,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # gradle.properties 里写的是本机 Windows JDK 绝对路径，CI 上不存在；
-      # 这里把 wrapper 分发包地址换成官方源，并在下面命令行覆盖 java.home。
-      - name: Use official Gradle distribution on CI
-        run: >
-          sed -i
-          's#mirrors.cloud.tencent.com/gradle#services.gradle.org/distributions#'
-          gradle/wrapper/gradle-wrapper.properties
+      # gradle.properties 里写的是本机 Windows JDK 绝对路径，CI 上不存在且会被当成
+      # URI 解析触发 URISyntaxException；这里换成官方 wrapper 源，并清掉这两行本机路径。
+      # 守护进程用 setup-java 的 JDK17，JDK8 编译 toolchain 由 foojay 自动 provision。
+      - name: Normalize build config on CI
+        run: |
+          sed -i 's#mirrors.cloud.tencent.com/gradle#services.gradle.org/distributions#' gradle/wrapper/gradle-wrapper.properties
+          sed -i -E '/^org\.gradle\.java\.home=/d; /^org\.gradle\.java\.installations\.paths=/d' gradle.properties
 
       - name: Set up Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
